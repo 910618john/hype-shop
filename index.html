@@ -1,93 +1,180 @@
 <!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HYPE 潮流精品</title>
-<meta name="description" content="潮流精品 · 正品現貨，IG 私訊詢問">
-<meta property="og:title" content="HYPE 潮流精品"><meta property="og:description" content="潮流精品 · 正品現貨，IG 私訊詢問"><meta property="og:type" content="website">
+<meta name="description" content="潮流精品 · 正品現貨，IG / LINE 詢問">
+<meta property="og:title" content="HYPE 潮流精品"><meta property="og:description" content="潮流精品 · 正品現貨，IG / LINE 詢問"><meta property="og:type" content="website">
 <link rel="stylesheet" href="style.css"></head>
 <body>
-<header><div class="wrap">
+<header>
+<div class="notice" id="notice" hidden></div>
+<div class="wrap">
   <div class="top"><h1 id="title">HYPE</h1>
-    <div style="display:flex;gap:8px;align-items:center"><input class="search" id="q" placeholder="搜尋商品"><a class="btn line" id="lineTop" target="_blank" rel="noopener" hidden>LINE</a><a class="btn ig" id="igTop" target="_blank" rel="noopener" hidden>IG</a></div>
+    <div style="display:flex;gap:8px;align-items:center"><input class="search" id="q"><button id="lang" style="padding:7px 12px">EN</button><a class="btn line" id="lineTop" target="_blank" rel="noopener" hidden>LINE</a><a class="btn ig" id="igTop" target="_blank" rel="noopener" hidden>IG</a></div>
   </div>
   <div class="chips" id="chips"></div>
   <div class="filters">
-    <select id="fCat"><option value="">全部類別</option></select>
-    <select id="fSize"><option value="">全部尺寸</option></select>
-    <select id="fSort"><option value="new">最新上架</option><option value="asc">價格 低→高</option><option value="desc">價格 高→低</option></select>
-    <button id="fAvail">只看可購買</button>
+    <select id="fCat"></select><select id="fSize"></select><select id="fSort"></select>
+    <button id="fAvail"></button><button id="fFav"></button>
   </div>
 </div></header>
-<main class="wrap"><div class="logos" id="logos"></div><div class="grid" id="grid"></div><div class="empty" id="empty">載入中…</div></main>
+<main class="wrap"><div class="logos" id="logos"></div><div class="grid" id="grid"></div><div class="empty" id="empty"></div></main>
 <dialog id="viewDlg"><div id="view"></div></dialog>
+<dialog id="orderDlg"><form class="dlg" id="orderForm">
+  <h2 id="oTitle"></h2><div id="oItem" style="font-weight:600"></div>
+  <label data-t="oName"></label><input name="name" required>
+  <label data-t="oPhone"></label><input name="phone" type="tel" required>
+  <label data-t="oContact"></label><input name="contact" placeholder="IG / LINE">
+  <label data-t="oShip"></label><select name="shipping" id="oShip"></select>
+  <label data-t="oAddr"></label><input name="address">
+  <label data-t="oNote"></label><textarea name="note"></textarea>
+  <div class="msg" id="oMsg"></div>
+  <div class="row"><button type="button" id="oCancel" data-t="cancel"></button><button class="pri" type="submit" id="oSend" data-t="send"></button></div>
+</form></dialog>
+<dialog id="zoom"><button class="x" id="zx">×</button><img id="zimg" alt=""></dialog>
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>n||n===0?"NT$ "+Number(n).toLocaleString():"";
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const CATS=["上衣","外套","褲子","鞋","包","配件","其他"];
-const ST={available:"",reserved:"保留中",sold:"已售出"};
+const T={
+ zh:{search:"搜尋商品",all:"全部",allCat:"全部類別",allSize:"全部尺寸",new:"最新上架",asc:"價格 低→高",desc:"價格 高→低",avail:"只看可購買",favs:"♥ 收藏",empty:"還沒有商品",nomatch:"沒有符合的商品",nofav:"還沒有收藏，點商品右上角 ♡",loading:"載入中…",fail:"讀取失敗，請重新整理",
+   reserved:"保留中",sold:"已售出",cond:"狀況",size:"尺寸",cat:"類別",share:"分享",askLine:"LINE 詢問",askIg:"IG 私訊詢問",close:"關閉",order:"我要下單",left:n=>`剩 ${n} 件`,similar:"你可能也喜歡",
+   cpIg:"已複製詢問內容，貼到 IG 私訊即可",cpLine:"已複製詢問內容，貼到 LINE 即可",cpLink:"已複製連結",ask:"你好，想詢問：",
+   oTitle:"下單資料",oName:"姓名",oPhone:"電話",oContact:"IG / LINE 帳號",oShip:"取貨方式",oAddr:"門市名稱 / 地址",oNote:"備註",cancel:"取消",send:"送出",sending:"送出中…",sent:"已送出！我們會盡快聯絡你",oFail:"送出失敗，請改用 IG / LINE 聯絡",
+   ship:["7-11 店到店","全家店到店","宅配","面交"]},
+ en:{search:"Search",all:"All",allCat:"All categories",allSize:"All sizes",new:"Newest",asc:"Price: low → high",desc:"Price: high → low",avail:"Available only",favs:"♥ Saved",empty:"No items yet",nomatch:"No matching items",nofav:"Nothing saved yet — tap ♡ on an item",loading:"Loading…",fail:"Failed to load, please refresh",
+   reserved:"Reserved",sold:"Sold",cond:"Condition",size:"Size",cat:"Category",share:"Share",askLine:"Ask on LINE",askIg:"DM on Instagram",close:"Close",order:"Order",left:n=>`${n} left`,similar:"You may also like",
+   cpIg:"Message copied — paste it in your Instagram DM",cpLine:"Message copied — paste it in LINE",cpLink:"Link copied",ask:"Hi, I'm interested in: ",
+   oTitle:"Order details",oName:"Name",oPhone:"Phone",oContact:"Instagram / LINE ID",oShip:"Delivery",oAddr:"Store / address",oNote:"Notes",cancel:"Cancel",send:"Send",sending:"Sending…",sent:"Sent! We'll contact you soon",oFail:"Failed — please contact us on IG / LINE",
+   ship:["7-11 pickup","FamilyMart pickup","Home delivery","Meet in person"]}};
+const TR={上衣:"Tops",外套:"Outerwear",褲子:"Bottoms",鞋:"Shoes",包:"Bags",配件:"Accessories",其他:"Other",全新:"New","9成新":"Like new","8成新":"Good",二手:"Used"};
+let lang=store.get("lang","zh");const t=k=>T[lang][k],tr=v=>lang==="en"&&TR[v]||v;
 const status=i=>i.status||(i.sold?"sold":"available");
+const isNew=i=>status(i)==="available"&&Date.now()-(i.createdAt||0)<7*864e5;
+const off=i=>i.origPrice>i.price&&i.price?Math.round((1-i.price/i.origPrice)*100):0;
 const lineUrl=v=>/^https?:/.test(v)?v:v.startsWith("@")?"https://line.me/R/ti/p/"+encodeURIComponent(v):"https://line.me/ti/p/~"+encodeURIComponent(v);
 const shareUrl=i=>new URL("p/"+i.id+".html",location.href.split("#")[0]).href;
-let site={},items=[],brand="全部",onlyAvail=false;
+let site={},items=[],brand="全部",onlyAvail=false,onlyFav=false,favs=new Set(store.get("favs",[]));
 
+function badges(i){const s=status(i),b=[];
+  if(s==="sold")b.push(`<span class="badge">SOLD</span>`);else if(s==="reserved")b.push(`<span class="badge reserved">${t("reserved")}</span>`);
+  if(isNew(i))b.push(`<span class="badge new">NEW</span>`);if(off(i)&&s!=="sold")b.push(`<span class="badge off">-${off(i)}%</span>`);
+  return b.length?`<div class="badges">${b.join("")}</div>`:""}
+function card(i,fav=true){const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
+  ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="${esc(i.brand+" "+i.name)}">`:`<div class="ph"></div>`}${badges(i)}
+  ${fav?`<button class="fav${favs.has(i.id)?" on":""}" data-fav="${esc(i.id)}" aria-label="收藏">${favs.has(i.id)?"♥":"♡"}</button>`:""}
+  <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${off(i)?`<span class="orig">${fmt(i.origPrice)}</span>`:""}</div>
+  ${fav?`<div class="tags">${[i.condition,i.size,i.category].filter(Boolean).map(x=>`<span class="tag">${esc(tr(x))}</span>`).join("")}${i.qty>1&&s!=="sold"?`<span class="stock">${t("left")(i.qty)}</span>`:""}</div>`:""}</div></div>`}
+
+function applyLang(){
+  document.documentElement.lang=lang==="en"?"en":"zh-Hant";$("lang").textContent=lang==="en"?"中":"EN";$("q").placeholder=t("search");
+  document.querySelectorAll("[data-t]").forEach(e=>e.textContent=t(e.dataset.t));$("oTitle").textContent=t("oTitle");
+  $("oShip").innerHTML=T.zh.ship.map((v,k)=>`<option value="${v}">${t("ship")[k]}</option>`).join("");
+  $("fSort").innerHTML=["new","asc","desc"].map(k=>`<option value="${k}">${t(k)}</option>`).join("");
+  $("fAvail").textContent=t("avail");fillFilters();render();
+}
 function render(){
   const brands=[...new Set(items.map(i=>i.brand))].sort((a,b)=>a.localeCompare(b));
-  $("chips").innerHTML=["全部",...brands].map(b=>`<button class="${b===brand?"on":""}" data-b="${esc(b)}">${esc(b)}${b==="全部"?"":" · "+items.filter(i=>i.brand===b).length}</button>`).join("");
+  $("chips").innerHTML=["全部",...brands].map(b=>`<button class="${b===brand?"on":""}" data-b="${esc(b)}">${b==="全部"?t("all"):esc(b)+" · "+items.filter(i=>i.brand===b).length}</button>`).join("");
   const logos=site.logos||{},q=$("q").value.trim().toLowerCase();
-  $("logos").innerHTML=brand==="全部"&&!q&&brands.some(b=>logos[b])?brands.map(b=>`<div class="logo" data-b="${esc(b)}">${logos[b]?`<img src="${esc(logos[b])}" alt="">`:""}<span>${esc(b)}</span></div>`).join(""):"";
-  const cat=$("fCat").value,size=$("fSize").value,sort=$("fSort").value;
-  $("fAvail").classList.toggle("on",onlyAvail);
-  let list=items.filter(i=>(brand==="全部"||i.brand===brand)&&(!cat||i.category===cat)&&(!size||i.size===size)&&(!onlyAvail||status(i)==="available")
-    &&(!q||[i.name,i.brand,i.desc,i.category,i.size,i.condition].join(" ").toLowerCase().includes(q)));
+  $("logos").innerHTML=brand==="全部"&&!q&&!onlyFav&&brands.some(b=>logos[b])?brands.map(b=>`<div class="logo" data-b="${esc(b)}">${logos[b]?`<img src="${esc(logos[b])}" alt="">`:""}<span>${esc(b)}</span></div>`).join(""):"";
+  const cat=$("fCat").value,size=$("fSize").value,sort=$("fSort").value||"new";
+  $("fAvail").classList.toggle("on",onlyAvail);$("fFav").classList.toggle("on",onlyFav);$("fFav").textContent=t("favs")+(favs.size?" "+favs.size:"");
+  const list=items.filter(i=>(brand==="全部"||i.brand===brand)&&(!cat||i.category===cat)&&(!size||i.size===size)&&(!onlyAvail||status(i)==="available")&&(!onlyFav||favs.has(i.id))
+    &&(!q||[i.name,i.brand,i.desc,i.category,tr(i.category),i.size,i.condition].join(" ").toLowerCase().includes(q)));
   const p=i=>i.price??(sort==="asc"?Infinity:-Infinity);
   list.sort((a,b)=>(status(a)==="sold")-(status(b)==="sold")||(sort==="asc"?p(a)-p(b):sort==="desc"?p(b)-p(a):(b.createdAt||0)-(a.createdAt||0)));
-  $("grid").innerHTML=list.map(i=>{const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
-    ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
-    ${s==="sold"?`<span class="badge">SOLD</span>`:s==="reserved"?`<span class="badge reserved">保留中</span>`:""}
-    <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}</div>
-    <div class="tags">${[i.condition,i.size,i.category].filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div></div></div>`}).join("");
-  $("empty").hidden=list.length>0;$("empty").textContent=items.length?"沒有符合的商品":"還沒有商品";
+  $("grid").innerHTML=list.map(i=>card(i)).join("");
+  $("empty").hidden=list.length>0;$("empty").textContent=onlyFav&&!favs.size?t("nofav"):items.length?t("nomatch"):t("empty");
 }
 function fillFilters(){
-  const cats=CATS.filter(c=>items.some(i=>i.category===c)),sizes=[...new Set(items.map(i=>i.size).filter(Boolean))].sort();
-  $("fCat").innerHTML=`<option value="">全部類別</option>`+cats.map(c=>`<option>${esc(c)}</option>`).join("");
-  $("fSize").innerHTML=`<option value="">全部尺寸</option>`+sizes.map(s=>`<option>${esc(s)}</option>`).join("");
-  $("fCat").hidden=!cats.length;$("fSize").hidden=!sizes.length;
+  const cats=CATS.filter(c=>items.some(i=>i.category===c)),sizes=[...new Set(items.map(i=>i.size).filter(Boolean))].sort(),cv=$("fCat").value,sv=$("fSize").value;
+  $("fCat").innerHTML=`<option value="">${t("allCat")}</option>`+cats.map(c=>`<option value="${esc(c)}">${esc(tr(c))}</option>`).join("");
+  $("fSize").innerHTML=`<option value="">${t("allSize")}</option>`+sizes.map(s=>`<option>${esc(s)}</option>`).join("");
+  $("fCat").value=cv;$("fSize").value=sv;$("fCat").hidden=!cats.length;$("fSize").hidden=!sizes.length;
 }
+function toggleFav(id){favs.has(id)?favs.delete(id):favs.add(id);store.set("favs",[...favs]);render()}
 $("chips").onclick=$("logos").onclick=e=>{const b=e.target.closest("[data-b]");if(b){brand=b.dataset.b;render();scrollTo({top:0})}};
 $("q").oninput=$("fCat").onchange=$("fSize").onchange=$("fSort").onchange=render;
 $("fAvail").onclick=()=>{onlyAvail=!onlyAvail;render()};
-$("grid").onclick=e=>{const c=e.target.closest(".card");if(c)openView(items.find(i=>i.id===c.dataset.id))};
+$("fFav").onclick=()=>{onlyFav=!onlyFav;render()};
+$("lang").onclick=()=>{lang=lang==="en"?"zh":"en";store.set("lang",lang);applyLang()};
+$("grid").onclick=e=>{const f=e.target.closest("[data-fav]");if(f)return toggleFav(f.dataset.fav);const c=e.target.closest(".card");if(c)openView(items.find(i=>i.id===c.dataset.id))};
 
-function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2200)}
-async function copy(t){try{await navigator.clipboard.writeText(t);return true}catch{return false}}
+function toast(m){const d=document.createElement("div");d.className="toast";d.textContent=m;document.body.append(d);setTimeout(()=>d.remove(),2200)}
+async function copy(m){try{await navigator.clipboard.writeText(m);return true}catch{return false}}
+const count=(path,title)=>{try{window.goatcounter?.count?.({path,title})}catch{}};
 
+function similar(it){
+  const score=i=>(i.brand===it.brand?2:0)+(i.category&&i.category===it.category?1:0);
+  return items.filter(i=>i.id!==it.id&&score(i)>0).sort((a,b)=>(status(a)==="sold")-(status(b)==="sold")||score(b)-score(a)||(b.createdAt||0)-(a.createdAt||0)).slice(0,6);
+}
 function openView(it,idx=0){
-  if(!it)return;const ph=it.photos||[],s=status(it);
-  history.replaceState(null,"","#"+it.id);
-  $("view").innerHTML=`${ph.length?`<div class="gal"><img src="${esc(ph[idx])}" alt="">${ph.length>1?`<button class="nav l" data-i="${(idx-1+ph.length)%ph.length}">‹</button><button class="nav r" data-i="${(idx+1)%ph.length}">›</button>`:""}</div>${ph.length>1?`<div class="dots">${ph.map((_,k)=>`<span class="${k===idx?"on":""}"></span>`).join("")}</div>`:""}`:""}
-  <div class="dlg ${s==="sold"?"sold":""}"><div class="brand">${esc(it.brand)}${ST[s]?` · <span style="color:${s==="sold"?"var(--danger)":"#d98a00"}">${ST[s]}</span>`:""}</div>
-  <h2 style="margin:4px 0">${esc(it.name)}</h2><div class="price">${fmt(it.price)}</div>
-  <div class="tags">${[["狀況",it.condition],["尺寸",it.size],["類別",it.category]].filter(x=>x[1]).map(x=>`<span class="tag">${x[0]}：${esc(x[1])}</span>`).join("")}</div>
+  if(!it)return;const ph=it.photos||[],s=status(it),fresh=!$("viewDlg").open||$("viewDlg").dataset.id!==it.id;
+  $("viewDlg").dataset.id=it.id;history.replaceState(null,"","#"+it.id);if(fresh)count("item/"+it.id,it.brand+" "+it.name);
+  const sim=similar(it),fav=favs.has(it.id);
+  $("view").innerHTML=`${ph.length?`<div class="gal"><img id="galImg" src="${esc(ph[idx])}" alt="">${ph.length>1?`<button class="nav l" data-i="${(idx-1+ph.length)%ph.length}">‹</button><button class="nav r" data-i="${(idx+1)%ph.length}">›</button>`:""}</div>${ph.length>1?`<div class="dots">${ph.map((_,k)=>`<span class="${k===idx?"on":""}"></span>`).join("")}</div>`:""}`:""}
+  <div class="dlg ${s==="sold"?"sold":""}"><div class="brand">${esc(it.brand)}${s!=="available"?` · <span style="color:${s==="sold"?"var(--danger)":"#d98a00"}">${t(s)}</span>`:""}${isNew(it)?` · <span style="color:#1d6fe0">NEW</span>`:""}</div>
+  <h2 style="margin:4px 0">${esc(it.name)}</h2><div class="price">${fmt(it.price)}${off(it)?`<span class="orig">${fmt(it.origPrice)}</span> <span style="color:var(--danger);font-size:13px">-${off(it)}%</span>`:""}</div>
+  <div class="tags">${[["cond",it.condition],["size",it.size],["cat",it.category]].filter(x=>x[1]).map(x=>`<span class="tag">${t(x[0])}：${esc(tr(x[1]))}</span>`).join("")}${it.qty>1&&s!=="sold"?`<span class="stock">${t("left")(it.qty)}</span>`:""}</div>
   <div class="desc">${esc(it.desc)}</div>
-  <div class="row"><button id="share">分享</button>${s!=="sold"&&site.line?`<button class="btn line" id="askLine">LINE 詢問</button>`:""}${s!=="sold"&&site.ig?`<button class="btn ig" id="ask">IG 私訊詢問</button>`:""}<button class="pri" id="close">關閉</button></div></div>`;
+  <div class="row"><button id="vFav">${fav?"♥":"♡"}</button><button id="share">${t("share")}</button>${s!=="sold"&&site.line?`<button class="btn line" id="askLine">${t("askLine")}</button>`:""}${s!=="sold"&&site.ig?`<button class="btn ig" id="ask">${t("askIg")}</button>`:""}${s==="available"&&site.formspree?`<button class="pri" id="orderBtn">${t("order")}</button>`:""}<button id="close">${t("close")}</button></div>
+  ${sim.length?`<div class="sec">${t("similar")}</div><div class="sim">${sim.map(i=>card(i,false)).join("")}</div>`:""}</div>`;
   $("view").querySelectorAll(".nav").forEach(b=>b.onclick=()=>openView(it,+b.dataset.i));
+  $("view").querySelectorAll(".sim .card").forEach(c=>c.onclick=()=>{openView(items.find(i=>i.id===c.dataset.id));$("viewDlg").scrollTop=0});
+  if($("galImg"))$("galImg").onclick=()=>openZoom(ph[idx]);
   $("close").onclick=()=>$("viewDlg").close();
-  const msg=`你好，想詢問：${it.brand} ${it.name}${it.size?" / "+it.size:""}${it.price?"（"+fmt(it.price)+"）":""}\n${shareUrl(it)}`;
-  $("share").onclick=async()=>{const u=shareUrl(it);if(navigator.share)navigator.share({title:it.brand+" "+it.name,url:u}).catch(()=>{});else if(await copy(u))toast("已複製連結")};
-  if($("ask"))$("ask").onclick=async()=>{if(await copy(msg))toast("已複製詢問內容，貼到 IG 私訊即可");window.open("https://ig.me/m/"+encodeURIComponent(site.ig),"_blank","noopener")};
-  if($("askLine"))$("askLine").onclick=async()=>{if(await copy(msg))toast("已複製詢問內容，貼到 LINE 即可");window.open(lineUrl(site.line),"_blank","noopener")};
+  $("vFav").onclick=()=>{toggleFav(it.id);openView(it,idx)};
+  const msg=`${t("ask")}${it.brand} ${it.name}${it.size?" / "+it.size:""}${it.price?"（"+fmt(it.price)+"）":""}\n${shareUrl(it)}`;
+  $("share").onclick=async()=>{const u=shareUrl(it);if(navigator.share)navigator.share({title:it.brand+" "+it.name,url:u}).catch(()=>{});else if(await copy(u))toast(t("cpLink"))};
+  if($("ask"))$("ask").onclick=async()=>{if(await copy(msg))toast(t("cpIg"));window.open("https://ig.me/m/"+encodeURIComponent(site.ig),"_blank","noopener")};
+  if($("askLine"))$("askLine").onclick=async()=>{if(await copy(msg))toast(t("cpLine"));window.open(lineUrl(site.line),"_blank","noopener")};
+  if($("orderBtn"))$("orderBtn").onclick=()=>openOrder(it);
   if(!$("viewDlg").open)$("viewDlg").showModal();
 }
 $("viewDlg").onclose=()=>history.replaceState(null,"",location.pathname);
 
+let orderItem=null;
+function openOrder(it){orderItem=it;$("orderForm").reset();$("oItem").textContent=`${it.brand} ${it.name}${it.size?" / "+it.size:""} · ${fmt(it.price)}`;$("oMsg").textContent="";$("oSend").disabled=false;$("orderDlg").showModal()}
+$("oCancel").onclick=()=>$("orderDlg").close();
+$("orderForm").onsubmit=async e=>{
+  e.preventDefault();const f=Object.fromEntries(new FormData(e.target)),it=orderItem;$("oSend").disabled=true;$("oMsg").textContent=t("sending");
+  try{const r=await fetch("https://formspree.io/f/"+encodeURIComponent(site.formspree),{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},
+      body:JSON.stringify({_subject:`新訂單：${it.brand} ${it.name}`,商品:`${it.brand} ${it.name}`,尺寸:it.size||"",價格:it.price,連結:shareUrl(it),姓名:f.name,電話:f.phone,聯絡帳號:f.contact,取貨方式:f.shipping,地址門市:f.address,備註:f.note})});
+    if(!r.ok)throw 0;$("oMsg").style.color="var(--ok)";$("oMsg").textContent=t("sent");setTimeout(()=>{$("orderDlg").close();$("oMsg").style.color=""},1800);count("order/"+it.id,"下單 "+it.name)}
+  catch{$("oMsg").textContent=t("oFail");$("oSend").disabled=false}
+};
+
+// 照片放大：雙指縮放、拖曳、雙擊切換
+const Z={s:1,x:0,y:0,p:new Map(),d0:0,s0:1,last:0};
+function zApply(){$("zimg").style.transform=`translate(${Z.x}px,${Z.y}px) scale(${Z.s})`}
+function openZoom(src){$("zimg").src=src;Object.assign(Z,{s:1,x:0,y:0});Z.p.clear();zApply();$("zoom").showModal()}
+$("zx").onclick=()=>$("zoom").close();
+const zd=()=>{const [a,b]=[...Z.p.values()];return Math.hypot(a.x-b.x,a.y-b.y)};
+$("zoom").onpointerdown=e=>{if(e.target===$("zx"))return;$("zoom").setPointerCapture(e.pointerId);Z.p.set(e.pointerId,{x:e.clientX,y:e.clientY});if(Z.p.size===2){Z.d0=zd();Z.s0=Z.s}
+  if(Z.p.size===1){const now=Date.now();if(now-Z.last<300){Z.s=Z.s>1?1:2.5;if(Z.s===1)Z.x=Z.y=0;zApply()}Z.last=now}};
+$("zoom").onpointermove=e=>{const o=Z.p.get(e.pointerId);if(!o)return;const n={x:e.clientX,y:e.clientY};
+  if(Z.p.size===2){Z.p.set(e.pointerId,n);Z.s=Math.min(5,Math.max(1,Z.s0*zd()/Z.d0));if(Z.s===1)Z.x=Z.y=0}
+  else if(Z.s>1){Z.x+=n.x-o.x;Z.y+=n.y-o.y;Z.p.set(e.pointerId,n)}zApply()};
+$("zoom").onpointerup=$("zoom").onpointercancel=e=>Z.p.delete(e.pointerId);
+$("zoom").onwheel=e=>{e.preventDefault();Z.s=Math.min(5,Math.max(1,Z.s*(e.deltaY<0?1.15:.87)));if(Z.s===1)Z.x=Z.y=0;zApply()};
+
+function seo(){
+  const base=location.href.split("#")[0],s=document.createElement("script");s.type="application/ld+json";
+  s.textContent=JSON.stringify({"@context":"https://schema.org","@type":"ItemList",itemListElement:items.filter(i=>status(i)!=="sold").map((i,k)=>({"@type":"ListItem",position:k+1,url:new URL("p/"+i.id+".html",base).href,name:i.brand+" "+i.name}))});
+  document.head.append(s);
+}
+applyLang();$("empty").textContent=t("loading");
 fetch("data.json?t="+Date.now()).then(r=>r.json()).then(d=>{
   site=d.site||{};items=d.items||[];
   if(site.title){$("title").textContent=site.title;document.title=site.title}
+  if(site.notice){$("notice").hidden=false;$("notice").textContent=site.notice}
   if(site.ig){$("igTop").hidden=false;$("igTop").href="https://instagram.com/"+encodeURIComponent(site.ig)}
   if(site.line){$("lineTop").hidden=false;$("lineTop").href=lineUrl(site.line)}
-  fillFilters();render();
+  if(site.goatcounter&&/^[a-z0-9-]+$/.test(site.goatcounter)){const g=document.createElement("script");g.async=true;g.src="https://gc.zgo.at/count.js";g.dataset.goatcounter=`https://${site.goatcounter}.goatcounter.com/count`;document.head.append(g)}
+  fillFilters();render();seo();
   const h=decodeURIComponent(location.hash.slice(1));if(h)openView(items.find(i=>i.id===h));
-}).catch(()=>{$("empty").textContent="讀取失敗，請重新整理"});
+}).catch(()=>{$("empty").textContent=t("fail")});
 </script>
 </body></html>
