@@ -21,90 +21,129 @@
   <h2 id="formTitle">發布商品</h2>
   <label>品牌</label><input id="fBrand" list="brandList" required placeholder="例：Supreme"><datalist id="brandList"></datalist>
   <label>商品名稱</label><input id="fName" required>
-  <label>價格 (NT$)</label><input id="fPrice" type="number" min="0" inputmode="numeric">
-  <label>描述</label><textarea id="fDesc" placeholder="尺寸、狀況、購入管道…"></textarea>
-  <label style="display:flex;gap:8px;align-items:center;color:var(--fg)"><input type="checkbox" id="fSold"> 已售出</label>
-  <label>照片（可多張，第一張為封面）</label><input id="fPhotos" type="file" accept="image/*" multiple>
+  <div class="two">
+    <div><label>類別</label><select id="fCat"></select></div>
+    <div><label>尺寸</label><input id="fSize" list="sizeList" placeholder="M / US 9 / F"><datalist id="sizeList"></datalist></div>
+    <div><label>狀況</label><select id="fCond"><option value="">—</option><option>全新</option><option>9成新</option><option>8成新</option><option>二手</option></select></div>
+    <div><label>價格 (NT$)</label><input id="fPrice" type="number" min="0" inputmode="numeric"></div>
+  </div>
+  <label>狀態</label><select id="fStatus"><option value="available">可購買</option><option value="reserved">保留中</option><option value="sold">已售出</option></select>
+  <label>描述</label><textarea id="fDesc" placeholder="尺寸細節、購入管道…"></textarea>
+  <label>照片（拖曳或用 ← → 排序，第一張為封面）</label><input id="fPhotos" type="file" accept="image/*" multiple>
   <div class="thumbs" id="thumbs"></div>
   <div class="msg" id="fMsg"></div>
-  <div class="row"><button type="button" class="danger" id="del" hidden>刪除</button><button type="button" id="cancel">取消</button><button class="pri" id="save" type="submit">發布</button></div>
+  <div class="row"><button type="button" class="danger" id="del" hidden>刪除</button><button type="button" id="dup" hidden>複製商品</button><button type="button" id="cancel">取消</button><button class="pri" id="save" type="submit">發布</button></div>
 </form></dialog>
 
 <dialog id="setDlg"><form class="dlg" id="setForm" method="dialog">
   <h2>網站設定</h2>
   <label>網站名稱</label><input id="sTitle">
   <label>IG 帳號（不含 @）</label><input id="sIg" placeholder="your_ig">
+  <label>LINE（ID、@官方帳號 或 加好友連結）</label><input id="sLine" placeholder="@xxx 或 https://line.me/...">
+  <label style="display:flex;gap:8px;align-items:center;color:var(--fg)"><input type="checkbox" id="sWm"> 上傳照片自動加浮水印</label>
+  <label>浮水印文字（留空用 @IG帳號）</label><input id="sWmText">
+  <label>品牌 Logo</label><div id="logoList"></div>
   <div class="msg" id="sMsg"></div>
   <div class="row"><button type="button" id="logout">登出</button><button type="button" id="sCancel">取消</button><button class="pri" type="submit">儲存</button></div>
 </form></dialog>
 
 <script>
 const OWNER="910618john",REPO="hype-shop",BRANCH="main",API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/`;
+const BASE=new URL("./",location.href).href;
+const CATS=["上衣","外套","褲子","鞋","包","配件","其他"],SIZES=["XS","S","M","L","XL","XXL","F","US 7","US 8","US 9","US 10","US 11"];
+const ST={available:"可購買",reserved:"保留中",sold:"已售出"};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>n||n===0?"NT$ "+Number(n).toLocaleString():"";
-let token="",data={site:{},items:[]},sha=null,editing=null,pending=[];
+const status=i=>i.status||(i.sold?"sold":"available");
+let token="",data={site:{},items:[]},sha=null,editing=null,pending=[],logoDraft={};
 try{token=localStorage.getItem("gh_token")||""}catch{}
+$("fCat").innerHTML=`<option value="">—</option>`+CATS.map(c=>`<option>${c}</option>`).join("");
 
 async function gh(path,opt={}){
   const r=await fetch(API+path+(opt.method?"":"?ref="+BRANCH),{...opt,headers:{Authorization:"Bearer "+token,Accept:"application/vnd.github+json","Content-Type":"application/json"},cache:"no-store"});
   if(!r.ok){const e=new Error((await r.json().catch(()=>({}))).message||r.status);e.status=r.status;throw e}
   return r.json();
 }
-const b64utf8=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+const b64utf8=s=>{const b=new TextEncoder().encode(s);let o="";for(let i=0;i<b.length;i+=8192)o+=String.fromCharCode(...b.subarray(i,i+8192));return btoa(o)};
 const utf8b64=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,"")),c=>c.charCodeAt(0)));
+function blobB64(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.readAsDataURL(b)})}
+async function shaOf(path){try{return (await gh(path)).sha}catch{return null}}
+async function putFile(path,content,msg){const s=await shaOf(path);return gh(path,{method:"PUT",body:JSON.stringify({message:msg,content,branch:BRANCH,...(s?{sha:s}:{})})})}
+async function delFile(path){const s=await shaOf(path);if(s)await gh(path,{method:"DELETE",body:JSON.stringify({message:"刪除 "+path,sha:s,branch:BRANCH})}).catch(()=>{})}
+const inUse=p=>data.items.some(i=>(i.photos||[]).includes(p))||Object.values(data.site.logos||{}).includes(p);
+async function cleanup(paths){for(const p of paths)if(!inUse(p))await delFile(p)}
 
-async function load(){
-  const f=await gh("data.json");sha=f.sha;data=JSON.parse(utf8b64(f.content));data.site??={};data.items??=[];render();
-}
+async function load(){const f=await gh("data.json");sha=f.sha;data=JSON.parse(utf8b64(f.content));data.site??={};data.items??=[];render()}
 async function save(msg){
   try{const r=await gh("data.json",{method:"PUT",body:JSON.stringify({message:msg,content:b64utf8(JSON.stringify(data,null,2)),sha,branch:BRANCH})});sha=r.content.sha;render()}
   catch(e){if(e.status===409){await load();throw new Error("資料已被其他裝置更新，已重新載入，請再操作一次")}throw e}
 }
-function blobB64(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.readAsDataURL(b)})}
-async function delFile(path){try{const f=await gh(path);await gh(path,{method:"DELETE",body:JSON.stringify({message:"刪除圖片",sha:f.sha,branch:BRANCH})})}catch{}}
+function ogPage(i){
+  const t=`${i.brand} ${i.name}`,s=status(i),d=[s!=="available"?ST[s]:"",fmt(i.price),i.size,i.condition].filter(Boolean).join(" · "),img=i.photos?.[0]?BASE+i.photos[0]:"",to=`../#${i.id}`;
+  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${esc(t)}</title>
+<meta property="og:title" content="${esc(t)}"><meta property="og:description" content="${esc(d)}"><meta property="og:type" content="product"><meta property="og:url" content="${esc(BASE+"p/"+i.id+".html")}">
+${img?`<meta property="og:image" content="${esc(img)}"><meta name="twitter:card" content="summary_large_image">`:""}
+<meta http-equiv="refresh" content="0;url=${esc(to)}"></head><body><script>location.replace(${JSON.stringify(to)})<\/script></body></html>`;
+}
+const writeOg=i=>putFile("p/"+i.id+".html",b64utf8(ogPage(i)),"分享頁："+i.name).catch(()=>{});
 
 function render(){
   const items=[...data.items].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   $("brandList").innerHTML=[...new Set(items.map(i=>i.brand))].map(b=>`<option value="${esc(b)}">`).join("");
-  $("grid").innerHTML=items.map(i=>`<div class="card${i.sold?" sold":""}" data-id="${esc(i.id)}">
+  $("sizeList").innerHTML=[...new Set([...SIZES,...items.map(i=>i.size).filter(Boolean)])].map(s=>`<option value="${esc(s)}">`).join("");
+  $("grid").innerHTML=items.map(i=>{const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
     ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
-    ${i.sold?`<span class="badge">SOLD</span>`:""}
+    ${s==="sold"?`<span class="badge">SOLD</span>`:s==="reserved"?`<span class="badge reserved">保留中</span>`:""}
     <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}</div>
-    <button style="margin-top:8px;width:100%;justify-content:center" data-sold="${esc(i.id)}">${i.sold?"改回可購買":"標記已售"}</button></div></div>`).join("");
+    <select data-st="${esc(i.id)}">${Object.entries(ST).map(([k,v])=>`<option value="${k}"${k===s?" selected":""}>${v}</option>`).join("")}</select></div></div>`}).join("");
   $("empty").hidden=items.length>0;
 }
-$("grid").onclick=async e=>{
-  const s=e.target.closest("[data-sold]");
-  if(s){e.stopPropagation();const it=data.items.find(i=>i.id===s.dataset.sold);s.disabled=true;it.sold=!it.sold;
-    try{await save((it.sold?"已售：":"上架：")+it.name)}catch(err){it.sold=!it.sold;alert(err.message);render()}return}
-  const c=e.target.closest(".card");if(c)openForm(data.items.find(i=>i.id===c.dataset.id));
+$("grid").onclick=e=>{if(e.target.closest("select"))return;const c=e.target.closest(".card");if(c)openForm(data.items.find(i=>i.id===c.dataset.id))};
+$("grid").onchange=async e=>{
+  const sel=e.target.closest("[data-st]");if(!sel)return;const it=data.items.find(i=>i.id===sel.dataset.st),old=status(it);
+  sel.disabled=true;it.status=sel.value;delete it.sold;
+  try{await save(ST[it.status]+"："+it.name);writeOg(it)}catch(err){it.status=old;alert(err.message);render()}
 };
 
-function openForm(it){
-  editing=it||null;$("formTitle").textContent=it?"編輯商品":"發布商品";$("save").textContent=it?"儲存":"發布";$("del").hidden=!it;
-  $("fBrand").value=it?.brand||"";$("fName").value=it?.name||"";$("fPrice").value=it?.price??"";$("fDesc").value=it?.desc||"";$("fSold").checked=!!it?.sold;
-  pending=(it?.photos||[]).map(p=>({path:p,url:p}));$("fPhotos").value="";$("fMsg").textContent="";drawThumbs();$("formDlg").showModal();
+function openForm(it,asCopy=false){
+  editing=asCopy?null:it||null;$("formTitle").textContent=asCopy?"複製商品":it?"編輯商品":"發布商品";$("save").textContent=editing?"儲存":"發布";
+  $("del").hidden=$("dup").hidden=!editing;
+  $("fBrand").value=it?.brand||"";$("fName").value=it?.name||"";$("fCat").value=it?.category||"";$("fSize").value=asCopy?"":it?.size||"";
+  $("fCond").value=it?.condition||"";$("fPrice").value=it?.price??"";$("fStatus").value=asCopy?"available":it?status(it):"available";$("fDesc").value=it?.desc||"";
+  pending=(it?.photos||[]).map(p=>({path:p,url:p}));$("fPhotos").value="";$("fMsg").textContent=asCopy?"已複製，請修改尺寸等資料後發布":"";drawThumbs();
+  if(!$("formDlg").open)$("formDlg").showModal();
 }
-function drawThumbs(){$("thumbs").innerHTML=pending.map((p,k)=>`<div><img src="${esc(p.url)}"><b data-k="${k}">×</b></div>`).join("")}
-$("thumbs").onclick=e=>{const k=e.target.dataset.k;if(k!=null){pending.splice(+k,1);drawThumbs()}};
+function drawThumbs(){$("thumbs").innerHTML=pending.map((p,k)=>`<div draggable="true" data-k="${k}"><img src="${esc(p.url)}">${k===0?`<span class="cover">封面</span>`:""}<b data-x="${k}">×</b><div class="ctl"><i data-m="${k},-1">←</i><i data-m="${k},1">→</i></div></div>`).join("")}
+function move(from,to){if(to<0||to>=pending.length||from===to)return;pending.splice(to,0,pending.splice(from,1)[0]);drawThumbs()}
+$("thumbs").onclick=e=>{const x=e.target.dataset.x,m=e.target.dataset.m;if(x!=null){pending.splice(+x,1);drawThumbs()}if(m){const[k,d]=m.split(",").map(Number);move(k,k+d)}};
+let dragK=null;
+$("thumbs").ondragstart=e=>{const d=e.target.closest("[data-k]");if(d){dragK=+d.dataset.k;d.classList.add("drag")}};
+$("thumbs").ondragover=e=>e.preventDefault();
+$("thumbs").ondrop=e=>{e.preventDefault();const d=e.target.closest("[data-k]");if(d&&dragK!=null)move(dragK,+d.dataset.k);dragK=null};
+$("thumbs").ondragend=()=>{dragK=null;drawThumbs()};
 $("addBtn").onclick=()=>openForm();
 $("cancel").onclick=()=>$("formDlg").close();
+$("dup").onclick=()=>openForm(editing,true);
 
-function shrink(file){return new Promise(res=>{
+function shrink(file,{max=1600,type="image/jpeg",wm=""}={}){return new Promise(res=>{
   const img=new Image(),u=URL.createObjectURL(file);
-  img.onload=()=>{const m=1600,s=Math.min(1,m/Math.max(img.width,img.height)),c=document.createElement("canvas");
-    c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-    URL.revokeObjectURL(u);c.toBlob(b=>res(b),"image/jpeg",.85)};
+  img.onload=()=>{const s=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement("canvas"),x=c.getContext("2d");
+    c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);x.drawImage(img,0,0,c.width,c.height);
+    if(wm){const f=Math.max(16,Math.round(c.width*0.035));x.font=`700 ${f}px system-ui,sans-serif`;x.textAlign="right";x.textBaseline="bottom";
+      x.shadowColor="rgba(0,0,0,.6)";x.shadowBlur=f/4;x.fillStyle="rgba(255,255,255,.85)";x.fillText(wm,c.width-f*.8,c.height-f*.6)}
+    URL.revokeObjectURL(u);c.toBlob(b=>res(b),type,.85)};
   img.onerror=()=>{URL.revokeObjectURL(u);res(null)};img.src=u;})}
+const wmText=()=>data.site.watermark===false?"":(data.site.wmText||(data.site.ig?"@"+data.site.ig:""));
+async function uploadImg(blob,prefix,ext){const path=`img/${prefix}${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  await gh(path,{method:"PUT",body:JSON.stringify({message:"上傳圖片",content:await blobB64(blob),branch:BRANCH})});return path}
 
 $("fPhotos").onchange=async e=>{
   const files=[...e.target.files];if(!files.length)return;$("save").disabled=true;let n=0;
   for(const f of files){
     $("fMsg").textContent=`上傳中 ${++n}/${files.length}…`;
-    const b=await shrink(f);if(!b){$("fMsg").textContent="無法讀取：「"+f.name+"」";continue}
-    const path=`img/${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
-    try{await gh(path,{method:"PUT",body:JSON.stringify({message:"上傳圖片",content:await blobB64(b),branch:BRANCH})});pending.push({path,url:URL.createObjectURL(b)});drawThumbs()}
+    const b=await shrink(f,{wm:wmText()});if(!b){$("fMsg").textContent="無法讀取：「"+f.name+"」";continue}
+    try{const path=await uploadImg(b,"","jpg");pending.push({path,url:URL.createObjectURL(b)});drawThumbs()}
     catch(err){$("fMsg").textContent="上傳失敗："+err.message}
   }
   if($("fMsg").textContent.startsWith("上傳中"))$("fMsg").textContent="";$("save").disabled=false;e.target.value="";
@@ -112,29 +151,48 @@ $("fPhotos").onchange=async e=>{
 
 $("form").onsubmit=async e=>{
   e.preventDefault();
-  const v={brand:$("fBrand").value.trim(),name:$("fName").value.trim(),price:$("fPrice").value===""?null:Number($("fPrice").value),desc:$("fDesc").value.trim(),sold:$("fSold").checked,photos:pending.map(p=>p.path)};
+  const v={brand:$("fBrand").value.trim(),name:$("fName").value.trim(),category:$("fCat").value,size:$("fSize").value.trim(),condition:$("fCond").value,
+    price:$("fPrice").value===""?null:Number($("fPrice").value),status:$("fStatus").value,desc:$("fDesc").value.trim(),photos:pending.map(p=>p.path)};
   if(!v.brand||!v.name)return;$("save").disabled=true;$("fMsg").textContent="儲存中…";
-  const removed=(editing?.photos||[]).filter(p=>!v.photos.includes(p));
+  const removed=(editing?.photos||[]).filter(p=>!v.photos.includes(p));let it=editing;
   try{
-    if(editing)Object.assign(editing,v);else data.items.push({id:Date.now().toString(36),createdAt:Date.now(),...v});
+    if(it){Object.assign(it,v);delete it.sold}else{it={id:Date.now().toString(36),createdAt:Date.now(),...v};data.items.push(it)}
     await save((editing?"編輯：":"發布：")+v.name);$("formDlg").close();
-    for(const p of removed)await delFile(p);
+    await writeOg(it);await cleanup(removed);
   }catch(err){$("fMsg").textContent="儲存失敗："+err.message}
   $("save").disabled=false;
 };
 $("del").onclick=async()=>{
   if(!editing||!confirm("確定刪除「"+editing.name+"」？"))return;
   const it=editing;data.items=data.items.filter(i=>i!==it);
-  try{await save("刪除："+it.name);$("formDlg").close();for(const p of it.photos||[])await delFile(p)}catch(err){$("fMsg").textContent="刪除失敗："+err.message}
+  try{await save("刪除："+it.name);$("formDlg").close();await delFile("p/"+it.id+".html");await cleanup(it.photos||[])}
+  catch(err){data.items.push(it);$("fMsg").textContent="刪除失敗："+err.message}
 };
 
-$("setBtn").onclick=()=>{$("sTitle").value=data.site.title||"";$("sIg").value=data.site.ig||"";$("sMsg").textContent="";$("setDlg").showModal()};
+function drawLogos(){
+  const brands=[...new Set(data.items.map(i=>i.brand))].sort((a,b)=>a.localeCompare(b));
+  $("logoList").innerHTML=brands.length?brands.map(b=>`<div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+    <div class="logo" style="width:56px;padding:4px;cursor:default">${logoDraft[b]?`<img src="${esc(logoDraft[b])}" style="max-width:90%;max-height:90%">`:""}</div>
+    <span style="flex:1">${esc(b)}</span><button type="button" data-up="${esc(b)}">上傳</button>${logoDraft[b]?`<button type="button" class="danger" data-rm="${esc(b)}">移除</button>`:""}</div>`).join("")
+    :`<div style="color:var(--mute);font-size:13px">先發布商品後，這裡會列出品牌</div>`;
+}
+$("logoList").onclick=e=>{
+  const up=e.target.dataset.up,rm=e.target.dataset.rm;
+  if(rm!=null){delete logoDraft[rm];drawLogos()}
+  if(up!=null){const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=async()=>{
+    const f=inp.files[0];if(!f)return;$("sMsg").textContent="上傳 Logo 中…";
+    try{const b=await shrink(f,{max:400,type:"image/png"});logoDraft[up]=await uploadImg(b,"logo-","png");$("sMsg").textContent="";drawLogos()}catch(err){$("sMsg").textContent="上傳失敗："+err.message}};inp.click()}
+};
+$("setBtn").onclick=()=>{const s=data.site;$("sTitle").value=s.title||"";$("sIg").value=s.ig||"";$("sLine").value=s.line||"";$("sWm").checked=s.watermark!==false;$("sWmText").value=s.wmText||"";
+  logoDraft={...(s.logos||{})};drawLogos();$("sMsg").textContent="";$("setDlg").showModal()};
 $("sCancel").onclick=()=>$("setDlg").close();
-$("setForm").onsubmit=async e=>{e.preventDefault();data.site.title=$("sTitle").value.trim();data.site.ig=$("sIg").value.trim().replace(/^@/,"");
-  try{await save("更新網站設定");$("setDlg").close()}catch(err){$("sMsg").textContent=err.message}};
+$("setForm").onsubmit=async e=>{e.preventDefault();const s=data.site,old=Object.values(s.logos||{});
+  Object.assign(s,{title:$("sTitle").value.trim(),ig:$("sIg").value.trim().replace(/^@/,""),line:$("sLine").value.trim(),watermark:$("sWm").checked,wmText:$("sWmText").value.trim(),logos:logoDraft});
+  try{await save("更新網站設定");$("setDlg").close();await cleanup(old.filter(p=>!Object.values(logoDraft).includes(p)))}catch(err){$("sMsg").textContent=err.message}};
 $("logout").onclick=()=>{try{localStorage.removeItem("gh_token")}catch{}location.reload()};
 
 async function start(){
+  if(!token){$("login").hidden=false;return}
   try{await load();$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=false;try{localStorage.setItem("gh_token",token)}catch{}}
   catch(err){$("login").hidden=false;$("lMsg").textContent=token?"登入失敗："+err.message:""}
 }
