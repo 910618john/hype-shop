@@ -130,7 +130,8 @@ function openView(it,idx=0){
   $("share").onclick=async()=>{const u=shareUrl(it);if(navigator.share)navigator.share({title:it.brand+" "+it.name,url:u}).catch(()=>{});else if(await copy(u))toast(t("cpLink"))};
   if($("ask"))$("ask").onclick=async()=>{if(await copy(msg))toast(t("cpIg"));window.open("https://ig.me/m/"+encodeURIComponent(site.ig),"_blank","noopener")};
   if($("askLine"))$("askLine").onclick=async()=>{if(await copy(msg))toast(t("cpLine"));window.open(lineUrl(site.line),"_blank","noopener")};
-  if($("orderBtn"))$("orderBtn").onclick=()=>openOrder(it);
+  if($("orderBtn"))$("orderBtn").onclick=()=>{if(/^https:\/\/(docs\.google\.com|forms\.gle)\//.test(site.formspree)){count("order/"+it.id,"下單 "+it.name);
+    window.open(site.formspree.replace(/ITEM/g,encodeURIComponent(`${it.brand} ${it.name}${it.size?" / "+it.size:""} ${fmt(it.price)} ${shareUrl(it)}`)),"_blank","noopener")}else openOrder(it)};
   if(!$("viewDlg").open)$("viewDlg").showModal();
 }
 $("viewDlg").onclose=()=>history.replaceState(null,"",location.pathname);

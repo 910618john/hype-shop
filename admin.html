@@ -71,7 +71,7 @@
   <label>LINE（ID、@官方帳號 或 加好友連結）</label><input id="sLine" placeholder="@xxx 或 https://line.me/...">
   <label style="display:flex;gap:8px;align-items:center;color:var(--fg)"><input type="checkbox" id="sWm"> 上傳照片自動加浮水印</label>
   <label>浮水印文字（留空用 @IG帳號）</label><input id="sWmText">
-  <label>下單表單 Formspree ID（formspree.io/f/<b>這段</b>，留空不顯示下單）</label><input id="sForm" placeholder="xyzabcde">
+  <label>下單表單：Google 表單「預先填入」連結（商品欄填 ITEM，留空不顯示下單）</label><input id="sForm" placeholder="https://docs.google.com/forms/d/e/.../viewform?usp=pp_url&entry.123=ITEM">
   <label>瀏覽統計 GoatCounter 代碼（<b>代碼</b>.goatcounter.com）</label><input id="sGc" placeholder="hypeshop">
   <div id="gcLink" style="font-size:13px;margin-top:4px"></div>
   <label>品牌 Logo</label><div id="logoList"></div>
@@ -361,7 +361,7 @@ $("setBtn").onclick=()=>{const s=data.site;$("sTitle").value=s.title||"";$("sNot
 $("sCancel").onclick=()=>$("setDlg").close();
 $("setForm").onsubmit=async e=>{e.preventDefault();const s=data.site,old=Object.values(s.logos||{});
   Object.assign(s,{title:$("sTitle").value.trim(),notice:$("sNotice").value.trim(),ig:$("sIg").value.trim().replace(/^@/,""),line:$("sLine").value.trim(),watermark:$("sWm").checked,wmText:$("sWmText").value.trim(),
-    formspree:$("sForm").value.trim().replace(/^.*\/f\//,""),goatcounter:$("sGc").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\.goatcounter\.com.*$/,""),logos:logoDraft});
+    formspree:(v=>/^https?:/.test(v)&&!/formspree\.io/.test(v)?v:v.replace(/^.*\/f\//,""))($("sForm").value.trim()),goatcounter:$("sGc").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\.goatcounter\.com.*$/,""),logos:logoDraft});
   try{await save("更新網站設定");$("setDlg").close();await cleanup(old.filter(p=>!Object.values(logoDraft).includes(p)))}catch(err){$("sMsg").textContent=err.message}};
 $("logout").onclick=()=>{ls.set("gh_token","");ls.set("hs_pass","");location.reload()};
 
