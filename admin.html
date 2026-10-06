@@ -9,7 +9,7 @@
   <div class="top"><h1>後台</h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><a class="btn" href="./" target="_blank">看前台</a><button id="setBtn" hidden>設定</button><button class="pri" id="addBtn" hidden>＋ 發布</button></div>
   </div>
-  <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="sales">銷售紀錄</button><span style="flex:1"></span><button id="csvItems">匯出商品 CSV</button></div>
+  <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="brands">品牌</button><button data-tab="sales">銷售紀錄</button><span style="flex:1"></span><button id="csvItems">匯出商品 CSV</button></div>
 </div></header>
 <main class="wrap">
   <div id="login" class="dlg" style="max-width:480px;margin:40px auto" hidden>
@@ -19,6 +19,7 @@
     <div class="row"><button class="pri" id="loginBtn">登入</button></div>
   </div>
   <section id="pItems"><div class="grid" id="grid"></div><div class="empty" id="empty" hidden>還沒有商品，按「＋ 發布」</div></section>
+  <section id="pBrands" hidden></section>
   <section id="pSales" hidden></section>
 </main>
 <div class="bar" id="bar" hidden><b id="selN"></b><button data-batch="available">可購買</button><button data-batch="reserved">保留中</button><button data-batch="sold">已售出</button><button data-batch="delete" class="danger">刪除</button><button data-batch="none">取消選取</button></div>
@@ -77,7 +78,6 @@
   <label>下單表單：Google 表單「預先填入」連結（商品欄填 ITEM，留空不顯示下單）</label><input id="sForm" placeholder="https://docs.google.com/forms/d/e/.../viewform?usp=pp_url&entry.123=ITEM">
   <label>瀏覽統計 GoatCounter 代碼（<b>代碼</b>.goatcounter.com）</label><input id="sGc" placeholder="hypeshop">
   <div id="gcLink" style="font-size:13px;margin-top:4px"></div>
-  <label>品牌 Logo</label><div id="logoList"></div>
   <div class="msg" id="sMsg"></div>
   <div class="row acts"><button type="button" id="logout">登出</button><button type="button" id="sCancel">取消</button><button class="pri" type="submit">儲存</button></div>
 </form></dialog>
@@ -93,7 +93,7 @@ const fmt=n=>n||n===0?"NT$ "+Number(n).toLocaleString():"";
 const num=v=>v===""||v==null?null:Number(v);
 const status=i=>i.status||(i.sold?"sold":"available");
 const ls={get(k){try{return localStorage.getItem(k)||""}catch{return ""}},set(k,v){try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch{}}};
-let token=ls.get("gh_token"),data={site:{},items:[]},sha=null,editing=null,pending=[],logoDraft={},sel=new Set(),tab="items";
+let token=ls.get("gh_token"),data={site:{},items:[]},sha=null,editing=null,pending=[],sel=new Set(),tab="items";
 let priv=null,privSha=null,privState="none",privKey=null,privSalt=null;
 $("fCat").innerHTML=`<option value="">—</option>`+CATS.map(c=>`<option>${c}</option>`).join("");
 
@@ -166,7 +166,7 @@ const writeSitemap=()=>putFile("sitemap.xml",b64utf8(`<?xml version="1.0" encodi
 // ---------- 商品列表 ----------
 function render(){
   const items=[...data.items].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  $("brandList").innerHTML=[...new Set(items.map(i=>i.brand))].map(b=>`<option value="${esc(b)}">`).join("");
+  $("brandList").innerHTML=allBrands().map(b=>`<option value="${esc(b)}">`).join("");
   $("sizeList").innerHTML=[...new Set([...SIZES,...items.map(i=>i.size).filter(Boolean)])].map(s=>`<option value="${esc(s)}">`).join("");
   $("grid").innerHTML=items.map(i=>{const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
     ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
@@ -177,7 +177,7 @@ function render(){
   $("empty").hidden=items.length>0;
   for(const id of sel)if(!data.items.some(i=>i.id===id))sel.delete(id);
   $("bar").hidden=!sel.size||tab!=="items";$("selN").textContent=`已選 ${sel.size} 件`;
-  if(tab==="sales")renderSales();
+  if(tab==="sales")renderSales();if(tab==="brands")renderBrands();
 }
 $("grid").onclick=e=>{if(e.target.closest("select,.chk"))return;const c=e.target.closest(".card");if(c)openForm(data.items.find(i=>i.id===c.dataset.id))};
 $("grid").onchange=async e=>{
@@ -251,6 +251,7 @@ $("form").onsubmit=async e=>{
   const removed=(editing?.photos||[]).filter(p=>!v.photos.includes(p)),isNewItem=!editing;let it=editing;
   try{
     if(it){Object.assign(it,v);delete it.sold}else{it={id:Date.now().toString(36),createdAt:Date.now(),...v};data.items.push(it)}
+    data.site.brands=allBrands();
     await save((editing?"編輯：":"發布：")+v.name);
     if(privState==="open"){const c=num($("fCost").value);if((priv.costs[it.id]??null)!==c){c==null?delete priv.costs[it.id]:priv.costs[it.id]=c;await savePriv("更新成本")}}
     $("formDlg").close();await writePage(it);if(isNewItem)await writeSitemap();await cleanup(removed);
@@ -284,7 +285,7 @@ $("saleForm").onsubmit=async e=>{
 };
 
 // ---------- 銷售紀錄頁 ----------
-function setTab(t){tab=t;$("tabs").querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));$("pItems").hidden=t!=="items";$("pSales").hidden=t!=="sales";render()}
+function setTab(t){tab=t;$("tabs").querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));$("pItems").hidden=t!=="items";$("pBrands").hidden=t!=="brands";$("pSales").hidden=t!=="sales";render()}
 $("tabs").onclick=e=>{const t=e.target.dataset.tab;if(t)setTab(t)};
 function renderSales(){
   const P=$("pSales");
@@ -343,29 +344,48 @@ $("igPost").onclick=async()=>{
 $("igCopy").onclick=async()=>{try{await navigator.clipboard.writeText($("igCap").value);$("igCopy").textContent="已複製 ✓"}catch{$("igCap").select()}setTimeout(()=>$("igCopy").textContent="複製文案",1500)};
 $("igClose").onclick=()=>$("igDlg").close();
 
-// ---------- 設定 ----------
-function drawLogos(){
-  const brands=[...new Set(data.items.map(i=>i.brand))].sort((a,b)=>a.localeCompare(b));
-  $("logoList").innerHTML=brands.length?brands.map(b=>`<div style="display:flex;align-items:center;gap:10px;margin:6px 0">
-    <div class="logo" style="width:56px;padding:4px;cursor:default">${logoDraft[b]?`<img src="${esc(logoDraft[b])}" style="max-width:90%;max-height:90%">`:""}</div>
-    <span style="flex:1">${esc(b)}</span><button type="button" data-up="${esc(b)}">上傳</button>${logoDraft[b]?`<button type="button" class="danger" data-rm="${esc(b)}">移除</button>`:""}</div>`).join("")
-    :`<div style="color:var(--mute);font-size:13px">先發布商品後，這裡會列出品牌</div>`;
+// ---------- 品牌管理 ----------
+function allBrands(){const l=[...(data.site.brands||[])];for(const i of data.items)if(i.brand&&!l.includes(i.brand))l.push(i.brand);return l}
+function renderBrands(){
+  const L=allBrands(),logos=data.site.logos||{},cnt=b=>data.items.filter(i=>i.brand===b).length;
+  $("pBrands").innerHTML=`<div class="panel" style="max-width:640px">
+    <div style="display:flex;gap:8px"><input id="newBrand" placeholder="新品牌名稱，例：Stüssy"><button class="pri" id="addBrand" style="flex:none">＋ 新增</button></div>
+    <div class="msg" id="bMsg"></div>
+    ${L.length?L.map((b,k)=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)">
+      <div class="logo" style="width:52px;padding:4px;cursor:default;flex:none">${logos[b]?`<img src="${esc(logos[b])}" style="max-width:90%;max-height:90%">`:`<span style="font-size:10px;color:var(--mute)">無Logo</span>`}</div>
+      <div style="flex:1;min-width:0"><b>${esc(b)}</b><div style="font-size:12px;color:var(--mute)">${cnt(b)} 件商品${cnt(b)?"":"（前台不顯示）"}</div></div>
+      <button data-bmv="${k},-1" ${k?"":"disabled"} style="padding:6px 10px">↑</button><button data-bmv="${k},1" ${k<L.length-1?"":"disabled"} style="padding:6px 10px">↓</button>
+      <select data-bact="${k}" style="width:auto;padding:6px 8px"><option value="">更多</option><option value="logo">上傳 Logo</option>${logos[b]?`<option value="rmlogo">移除 Logo</option>`:""}<option value="rename">改名</option><option value="del">刪除</option></select>
+    </div>`).join(""):`<div style="color:var(--mute);padding:20px 0">還沒有品牌，從上面新增</div>`}
+    <div style="font-size:12px;color:var(--mute);margin-top:8px">順序就是前台品牌按鈕和 Logo 牆的順序。</div></div>`;
+  const msg=t=>{$("bMsg").textContent=t};
+  const commit=async(m,after)=>{try{msg("儲存中…");await save(m);msg("");if(after)await after()}catch(err){msg(err.message);await load()}};
+  $("addBrand").onclick=()=>{const n=$("newBrand").value.trim();if(!n)return;if(L.some(b=>b.toLowerCase()===n.toLowerCase()))return msg("已經有這個品牌");data.site.brands=[...L,n];commit("新增品牌："+n)};
+  $("newBrand").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();$("addBrand").click()}};
+  $("pBrands").querySelectorAll("[data-bmv]").forEach(x=>x.onclick=()=>{const[k,d]=x.dataset.bmv.split(",").map(Number);const l=[...L];[l[k],l[k+d]]=[l[k+d],l[k]];data.site.brands=l;commit("調整品牌順序")});
+  $("pBrands").querySelectorAll("[data-bact]").forEach(x=>x.onchange=async()=>{
+    const b=L[+x.dataset.bact],a=x.value;x.value="";
+    if(a==="logo"){const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=async()=>{const f=inp.files[0];if(!f)return;msg("上傳 Logo 中…");
+      try{const old=logos[b],blob=await shrink(f,{max:400,type:"image/png"});data.site.logos={...logos,[b]:await uploadImg(blob,"logo-","png")};await commit("品牌 Logo："+b,()=>old&&cleanup([old]))}catch(err){msg("上傳失敗："+err.message)}};inp.click()}
+    if(a==="rmlogo"){const old=logos[b];const l={...logos};delete l[b];data.site.logos=l;commit("移除 Logo："+b,()=>cleanup([old]))}
+    if(a==="rename"){const n=(prompt("新的品牌名稱",b)||"").trim();if(!n||n===b)return;if(L.some(x=>x!==b&&x.toLowerCase()===n.toLowerCase()))return msg("已經有這個品牌");
+      const hit=data.items.filter(i=>i.brand===b);hit.forEach(i=>i.brand=n);data.site.brands=L.map(x=>x===b?n:x);
+      if(logos[b]){const l={...logos,[n]:logos[b]};delete l[b];data.site.logos=l}
+      commit(`品牌改名：${b} → ${n}`,async()=>{for(const i of hit)await writePage(i)})}
+    if(a==="del"){if(cnt(b))return msg(`「${b}」還有 ${cnt(b)} 件商品，請先改品牌或刪除商品`);if(!confirm(`刪除品牌「${b}」？`))return;
+      const old=logos[b],l={...logos};delete l[b];data.site.logos=l;data.site.brands=L.filter(x=>x!==b);commit("刪除品牌："+b,()=>old&&cleanup([old]))}
+  });
 }
-$("logoList").onclick=e=>{
-  const up=e.target.dataset.up,rm=e.target.dataset.rm;
-  if(rm!=null){delete logoDraft[rm];drawLogos()}
-  if(up!=null){const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=async()=>{
-    const f=inp.files[0];if(!f)return;$("sMsg").textContent="上傳 Logo 中…";
-    try{const b=await shrink(f,{max:400,type:"image/png"});logoDraft[up]=await uploadImg(b,"logo-","png");$("sMsg").textContent="";drawLogos()}catch(err){$("sMsg").textContent="上傳失敗："+err.message}};inp.click()}
-};
+
+// ---------- 設定 ----------
 $("sGc").oninput=()=>{const v=$("sGc").value.trim();$("gcLink").innerHTML=v?`<a href="https://${esc(v)}.goatcounter.com" target="_blank" rel="noopener">→ 查看瀏覽統計</a>`:`<a href="https://www.goatcounter.com/signup" target="_blank" rel="noopener">→ 免費申請 GoatCounter</a>`};
 $("setBtn").onclick=()=>{const s=data.site;$("sTitle").value=s.title||"";$("sNotice").value=s.notice||"";$("sIg").value=s.ig||"";$("sLine").value=s.line||"";$("sWm").checked=s.watermark!==false;$("sWmText").value=s.wmText||"";
-  $("sForm").value=s.formspree||"";$("sGc").value=s.goatcounter||"";$("sGc").oninput();logoDraft={...(s.logos||{})};drawLogos();$("sMsg").textContent="";$("setDlg").showModal()};
+  $("sForm").value=s.formspree||"";$("sGc").value=s.goatcounter||"";$("sGc").oninput();$("sMsg").textContent="";$("setDlg").showModal()};
 $("sCancel").onclick=()=>$("setDlg").close();
-$("setForm").onsubmit=async e=>{e.preventDefault();const s=data.site,old=Object.values(s.logos||{});
+$("setForm").onsubmit=async e=>{e.preventDefault();const s=data.site;
   Object.assign(s,{title:$("sTitle").value.trim(),notice:$("sNotice").value.trim(),ig:$("sIg").value.trim().replace(/^@/,""),line:$("sLine").value.trim(),watermark:$("sWm").checked,wmText:$("sWmText").value.trim(),
-    formspree:(v=>/^https?:/.test(v)&&!/formspree\.io/.test(v)?v:v.replace(/^.*\/f\//,""))($("sForm").value.trim()),goatcounter:$("sGc").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\.goatcounter\.com.*$/,""),logos:logoDraft});
-  try{await save("更新網站設定");$("setDlg").close();await cleanup(old.filter(p=>!Object.values(logoDraft).includes(p)))}catch(err){$("sMsg").textContent=err.message}};
+    formspree:(v=>/^https?:/.test(v)&&!/formspree\.io/.test(v)?v:v.replace(/^.*\/f\//,""))($("sForm").value.trim()),goatcounter:$("sGc").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\.goatcounter\.com.*$/,"")});
+  try{await save("更新網站設定");$("setDlg").close()}catch(err){$("sMsg").textContent=err.message}};
 $("logout").onclick=()=>{ls.set("gh_token","");ls.set("hs_pass","");location.reload()};
 
 async function start(){
