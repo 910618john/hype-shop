@@ -9,7 +9,7 @@
   <div class="top"><h1>後台</h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><a class="btn" href="./" target="_blank">看前台</a><button id="setBtn" hidden>設定</button><button class="pri" id="addBtn" hidden>＋ 發布</button></div>
   </div>
-  <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="brands">品牌</button><button data-tab="sales">銷售紀錄</button><span style="flex:1"></span><button id="csvItems">匯出商品 CSV</button></div>
+  <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="brands">品牌</button><button data-tab="cats">分類</button><button data-tab="sales">銷售紀錄</button><span style="flex:1"></span><button id="csvItems">匯出商品 CSV</button></div>
 </div></header>
 <main class="wrap">
   <div id="login" class="dlg" style="max-width:480px;margin:40px auto" hidden>
@@ -20,6 +20,7 @@
   </div>
   <section id="pItems"><div class="grid" id="grid"></div><div class="empty" id="empty" hidden>還沒有商品，按「＋ 發布」</div></section>
   <section id="pBrands" hidden></section>
+  <section id="pCats" hidden></section>
   <section id="pSales" hidden></section>
 </main>
 <div class="bar" id="bar" hidden><b id="selN"></b><button data-batch="available">可購買</button><button data-batch="reserved">保留中</button><button data-batch="sold">已售出</button><button data-batch="delete" class="danger">刪除</button><button data-batch="none">取消選取</button></div>
@@ -29,9 +30,10 @@
   <label>品牌</label><input id="fBrand" list="brandList" required placeholder="例：Supreme"><datalist id="brandList"></datalist>
   <label>商品名稱</label><input id="fName" required>
   <div class="two">
-    <div><label>類別</label><select id="fCat"></select></div>
+    <div><label>大分類</label><select id="fGrp"></select></div>
+    <div><label>小分類</label><select id="fCat"></select></div>
     <div><label>尺寸</label><input id="fSize" list="sizeList" placeholder="M / US 9 / F"><datalist id="sizeList"></datalist></div>
-    <div><label>狀況</label><select id="fCond"><option value="">—</option><option>全新</option><option>9成新</option><option>8成新</option><option>二手</option></select></div>
+    <div><label>狀況</label><select id="fCond"></select></div>
     <div><label>狀態</label><select id="fStatus"><option value="available">可購買</option><option value="reserved">保留中</option><option value="sold">已售出</option></select></div>
     <div><label>售價 (NT$)</label><input id="fPrice" type="number" min="0" inputmode="numeric"></div>
     <div><label>原價（有填才顯示折扣）</label><input id="fOrig" type="number" min="0" inputmode="numeric"></div>
@@ -85,7 +87,7 @@
 <script>
 const OWNER="910618john",REPO="hype-shop",BRANCH="main",API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/`;
 const BASE=new URL("./",location.href).href;
-const CATS=["上衣","外套","褲子","鞋","包","配件","其他"],SIZES=["XS","S","M","L","XL","XXL","F","US 7","US 8","US 9","US 10","US 11"];
+const GROUPS=[{name:"衣服",subs:["上衣","襯衫","帽T / 衛衣","針織 / 毛衣","外套","褲子","短褲"]},{name:"鞋子",subs:["球鞋","靴子","拖鞋 / 涼鞋","皮鞋"]},{name:"飾品",subs:["項鍊","手環","戒指","耳環","手錶"]},{name:"包包",subs:["後背包","側背包","托特包","皮夾"]},{name:"配件",subs:["帽子","皮帶","襪子","其他"]}],CONDS=["全新未拆","全新","近全新","9成新","8成新","7成新以下"],NEWC=["全新未拆","全新"],SIZES=["XS","S","M","L","XL","XXL","F","US 7","US 8","US 9","US 10","US 11"];
 const ST={available:"可購買",reserved:"保留中",sold:"已售出"};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -95,7 +97,6 @@ const status=i=>i.status||(i.sold?"sold":"available");
 const ls={get(k){try{return localStorage.getItem(k)||""}catch{return ""}},set(k,v){try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch{}}};
 let token=ls.get("gh_token"),data={site:{},items:[]},sha=null,editing=null,pending=[],sel=new Set(),tab="items";
 let priv=null,privSha=null,privState="none",privKey=null,privSalt=null;
-$("fCat").innerHTML=`<option value="">—</option>`+CATS.map(c=>`<option>${c}</option>`).join("");
 
 // ---------- GitHub ----------
 async function gh(path,opt={}){
@@ -146,7 +147,7 @@ function productPage(i){
   const s=status(i),title=`${i.brand} ${i.name}`,siteT=data.site.title||"HYPE",url=BASE+"p/"+i.id+".html",img=i.photos?.[0]?BASE+i.photos[0]:"";
   const d=[s!=="available"?ST[s]:"",fmt(i.price),i.size,i.condition].filter(Boolean).join(" · ")+(i.desc?" — "+i.desc.slice(0,120):"");
   const ld={"@context":"https://schema.org","@type":"Product",name:title,brand:{"@type":"Brand",name:i.brand},image:(i.photos||[]).map(p=>BASE+p),description:i.desc||title,url,
-    ...(i.price!=null?{offers:{"@type":"Offer",price:i.price,priceCurrency:"TWD",availability:"https://schema.org/"+(s==="sold"?"SoldOut":"InStock"),itemCondition:"https://schema.org/"+(i.condition==="全新"?"NewCondition":"UsedCondition"),url}}:{})};
+    ...(i.price!=null?{offers:{"@type":"Offer",price:i.price,priceCurrency:"TWD",availability:"https://schema.org/"+(s==="sold"?"SoldOut":"InStock"),itemCondition:"https://schema.org/"+(NEWC.includes(i.condition)?"NewCondition":"UsedCondition"),url}}:{})};
   const go=`../#${i.id}`;
   return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} | ${esc(siteT)}</title><meta name="description" content="${esc(d)}"><link rel="canonical" href="${esc(url)}">
@@ -156,7 +157,7 @@ ${img?`<meta property="og:image" content="${esc(img)}"><meta name="twitter:card"
 <body><header><div class="wrap"><div class="top"><h1><a href="../" style="text-decoration:none">${esc(siteT)}</a></h1><a class="btn pri" href="${go}">查看 / 詢問</a></div></div></header>
 <main class="wrap" style="max-width:640px;padding:20px 16px 60px"><div class="brand">${esc(i.brand)}${s!=="available"?` · <span style="color:var(--danger)">${ST[s]}</span>`:""}</div>
 <h2 style="margin:4px 0">${esc(i.name)}</h2><div class="price">${fmt(i.price)}${i.origPrice>i.price?`<span class="orig">${fmt(i.origPrice)}</span>`:""}</div>
-<div class="tags">${[i.condition,i.size,i.category].filter(Boolean).map(x=>`<span class="tag">${esc(x)}</span>`).join("")}</div>
+<div class="tags">${[i.condition,i.size,i.group,i.category].filter(Boolean).map(x=>`<span class="tag">${esc(x)}</span>`).join("")}</div>
 <p class="desc">${esc(i.desc)}</p>${(i.photos||[]).map(p=>`<img src="../${esc(p)}" alt="${esc(title)}" loading="lazy" style="width:100%;border-radius:12px;margin-top:12px;display:block">`).join("")}
 <div class="row" style="justify-content:flex-start"><a class="btn pri" href="${go}">查看 / 詢問</a><a class="btn" href="../">更多商品</a></div></main></body></html>`;
 }
@@ -177,7 +178,7 @@ function render(){
   $("empty").hidden=items.length>0;
   for(const id of sel)if(!data.items.some(i=>i.id===id))sel.delete(id);
   $("bar").hidden=!sel.size||tab!=="items";$("selN").textContent=`已選 ${sel.size} 件`;
-  if(tab==="sales")renderSales();if(tab==="brands")renderBrands();
+  if(tab==="sales")renderSales();if(tab==="brands")renderBrands();if(tab==="cats")renderCats();
 }
 $("grid").onclick=e=>{if(e.target.closest("select,.chk"))return;const c=e.target.closest(".card");if(c)openForm(data.items.find(i=>i.id===c.dataset.id))};
 $("grid").onchange=async e=>{
@@ -201,7 +202,9 @@ $("bar").onclick=async e=>{
 // ---------- 商品表單 ----------
 function openForm(it,asCopy=false){
   editing=asCopy?null:it||null;$("formTitle").textContent=asCopy?"複製商品":it?"編輯商品":"發布商品";$("save").textContent=editing?"儲存":"發布";$("editRow").hidden=!editing;
-  $("fBrand").value=it?.brand||"";$("fName").value=it?.name||"";$("fCat").value=it?.category||"";$("fSize").value=asCopy?"":it?.size||"";
+  const opt=(l,v)=>`<option value="">—</option>`+[...l,...(v&&!l.includes(v)?[v]:[])].map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  $("fGrp").innerHTML=opt(groups().map(g=>g.name),it?.group);$("fGrp").value=it?groupOf(it):"";fillSubs(it?.category);$("fCond").innerHTML=opt(CONDS,it?.condition);
+  $("fBrand").value=it?.brand||"";$("fName").value=it?.name||"";$("fSize").value=asCopy?"":it?.size||"";
   $("fCond").value=it?.condition||"";$("fPrice").value=it?.price??"";$("fOrig").value=it?.origPrice??"";$("fQty").value=asCopy?1:it?.qty??1;
   $("fStatus").value=asCopy?"available":it?status(it):"available";$("fDesc").value=it?.desc||"";
   const open=privState==="open";$("fCost").disabled=!open;$("costHint").hidden=open;$("fCost").value=open&&it?priv.costs[it.id]??"":"";
@@ -245,7 +248,7 @@ $("fPhotos").onchange=async e=>{
 
 $("form").onsubmit=async e=>{
   e.preventDefault();
-  const v={brand:$("fBrand").value.trim(),name:$("fName").value.trim(),category:$("fCat").value,size:$("fSize").value.trim(),condition:$("fCond").value,
+  const v={brand:$("fBrand").value.trim(),name:$("fName").value.trim(),group:$("fGrp").value,category:$("fCat").value,size:$("fSize").value.trim(),condition:$("fCond").value,
     price:num($("fPrice").value),origPrice:num($("fOrig").value),qty:num($("fQty").value)??1,status:$("fStatus").value,desc:$("fDesc").value.trim(),photos:pending.map(p=>p.path)};
   if(!v.brand||!v.name)return;$("save").disabled=true;$("fMsg").textContent="儲存中…";
   const removed=(editing?.photos||[]).filter(p=>!v.photos.includes(p)),isNewItem=!editing;let it=editing;
@@ -285,7 +288,7 @@ $("saleForm").onsubmit=async e=>{
 };
 
 // ---------- 銷售紀錄頁 ----------
-function setTab(t){tab=t;$("tabs").querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));$("pItems").hidden=t!=="items";$("pBrands").hidden=t!=="brands";$("pSales").hidden=t!=="sales";render()}
+function setTab(t){tab=t;$("tabs").querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));$("pItems").hidden=t!=="items";$("pBrands").hidden=t!=="brands";$("pCats").hidden=t!=="cats";$("pSales").hidden=t!=="sales";render()}
 $("tabs").onclick=e=>{const t=e.target.dataset.tab;if(t)setTab(t)};
 function renderSales(){
   const P=$("pSales");
@@ -319,8 +322,8 @@ function csv(name,rows){
   const t="\ufeff"+rows.map(r=>r.map(v=>{v=String(v??"");return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}).join(",")).join("\r\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download=`${name}-${new Date().toISOString().slice(0,10)}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
-$("csvItems").onclick=()=>{const o=privState==="open";csv("items",[["ID","品牌","商品","類別","尺寸","狀況","狀態","售價","原價","庫存",...(o?["成本"]:[]),"上架日期","照片數","連結"],
-  ...data.items.map(i=>[i.id,i.brand,i.name,i.category,i.size,i.condition,ST[status(i)],i.price??"",i.origPrice??"",i.qty??1,...(o?[priv.costs[i.id]??""]:[]),new Date(i.createdAt||0).toISOString().slice(0,10),(i.photos||[]).length,BASE+"p/"+i.id+".html"])])};
+$("csvItems").onclick=()=>{const o=privState==="open";csv("items",[["ID","品牌","商品","大分類","小分類","尺寸","狀況","狀態","售價","原價","庫存",...(o?["成本"]:[]),"上架日期","照片數","連結"],
+  ...data.items.map(i=>[i.id,i.brand,i.name,groupOf(i),i.category,i.size,i.condition,ST[status(i)],i.price??"",i.origPrice??"",i.qty??1,...(o?[priv.costs[i.id]??""]:[]),new Date(i.createdAt||0).toISOString().slice(0,10),(i.photos||[]).length,BASE+"p/"+i.id+".html"])])};
 
 // ---------- IG 貼文圖 ----------
 function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
@@ -338,7 +341,7 @@ $("igPost").onclick=async()=>{
   if(data.site.ig){x.fillStyle="#fff";x.font="700 32px system-ui,sans-serif";x.fillText("@"+data.site.ig,W-56,1300)}
   const url=c.toDataURL("image/jpeg",.9);$("igImg").src=url;$("igDl").href=url;$("igDl").download=`${it.brand}-${it.name}.jpg`.replace(/[\\/:*?"<>|\s]+/g,"_");
   const tag=v=>"#"+String(v).replace(/[\s#]+/g,"");
-  $("igCap").value=`${it.brand} ${it.name}\n${[it.size&&"尺寸 "+it.size,it.condition].filter(Boolean).join("｜")}\n💰 ${fmt(it.price)}${it.origPrice>it.price?`（原價 ${fmt(it.origPrice)}）`:""}\n${it.desc?"\n"+it.desc+"\n":""}\n📩 私訊詢問｜商品連結在主頁\n🔗 ${BASE}p/${it.id}.html\n\n${[tag(it.brand),it.category&&tag(it.category),"#潮流","#精品","#正品","#二手精品","#streetwear"].filter(Boolean).join(" ")}`;
+  $("igCap").value=`${it.brand} ${it.name}\n${[it.size&&"尺寸 "+it.size,it.condition].filter(Boolean).join("｜")}\n💰 ${fmt(it.price)}${it.origPrice>it.price?`（原價 ${fmt(it.origPrice)}）`:""}\n${it.desc?"\n"+it.desc+"\n":""}\n📩 私訊詢問｜商品連結在主頁\n🔗 ${BASE}p/${it.id}.html\n\n${[tag(it.brand),it.group&&tag(it.group),it.category&&tag(it.category),"#潮流","#精品","#正品","#二手精品","#streetwear"].filter(Boolean).join(" ")}`;
   $("igDlg").showModal();
 };
 $("igCopy").onclick=async()=>{try{await navigator.clipboard.writeText($("igCap").value);$("igCopy").textContent="已複製 ✓"}catch{$("igCap").select()}setTimeout(()=>$("igCopy").textContent="複製文案",1500)};
@@ -375,6 +378,42 @@ function renderBrands(){
     if(a==="del"){if(cnt(b))return msg(`「${b}」還有 ${cnt(b)} 件商品，請先改品牌或刪除商品`);if(!confirm(`刪除品牌「${b}」？`))return;
       const old=logos[b],l={...logos};delete l[b];data.site.logos=l;data.site.brands=L.filter(x=>x!==b);commit("刪除品牌："+b,()=>old&&cleanup([old]))}
   });
+}
+
+// ---------- 分類管理（大分類 > 小分類） ----------
+const groups=()=>data.site.groups||GROUPS;
+function groupOf(i){const g=groups();return i.group&&g.some(x=>x.name===i.group)?i.group:g.find(x=>x.subs.includes(i.category))?.name||""}
+function fillSubs(v){const g=groups().find(x=>x.name===$("fGrp").value),l=g?g.subs:[];
+  $("fCat").innerHTML=`<option value="">—</option>`+[...l,...(v&&!l.includes(v)?[v]:[])].map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");$("fCat").value=v||"";$("fCat").disabled=!g}
+$("fGrp").onchange=()=>fillSubs("");
+function renderCats(){
+  const G=JSON.parse(JSON.stringify(groups())),gc=n=>data.items.filter(i=>groupOf(i)===n).length,sc=(g,c)=>data.items.filter(i=>i.category===c&&groupOf(i)===g).length;
+  $("pCats").innerHTML=`<div class="panel" style="max-width:680px">
+    <div style="display:flex;gap:8px"><input id="newGrp" placeholder="新大分類，例：古著、聯名"><button class="pri" id="addGrp" style="flex:none">＋ 大分類</button></div>
+    <div class="msg" id="cMsg"></div>
+    ${G.map((g,k)=>`<div style="padding:12px 0;border-top:1px solid var(--line)">
+      <div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b style="font-size:16px">${esc(g.name)}</b> <span style="font-size:12px;color:var(--mute)">${gc(g.name)} 件</span></div>
+      <button data-gmv="${k},-1" ${k?"":"disabled"} style="padding:6px 10px">↑</button><button data-gmv="${k},1" ${k<G.length-1?"":"disabled"} style="padding:6px 10px">↓</button>
+      <button data-gren="${k}" style="padding:6px 12px">改名</button><button data-gdel="${k}" class="danger" style="padding:6px 12px">刪除</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${g.subs.map((c,j)=>`<span class="tag" style="font-size:13px;padding:4px 4px 4px 10px;display:inline-flex;align-items:center;gap:2px;color:var(--fg)">
+        <i data-smv="${k},${j},-1" style="cursor:pointer;font-style:normal;padding:0 3px;color:var(--mute)">‹</i><span data-sren="${k},${j}" style="cursor:pointer">${esc(c)}${sc(g.name,c)?` <small style="color:var(--mute)">${sc(g.name,c)}</small>`:""}</span><i data-smv="${k},${j},1" style="cursor:pointer;font-style:normal;padding:0 3px;color:var(--mute)">›</i><i data-sdel="${k},${j}" style="cursor:pointer;font-style:normal;padding:0 6px;color:var(--danger)">×</i></span>`).join("")}
+        <button data-sadd="${k}" style="padding:3px 12px;font-size:13px">＋ 小分類</button></div></div>`).join("")}
+    <div style="font-size:12px;color:var(--mute);margin-top:8px">順序就是前台的順序。點小分類名稱可改名，‹ › 調整順序。沒有商品的分類前台不顯示。</div></div>`;
+  const msg=t=>{$("cMsg").textContent=t};
+  const commit=async(m,after)=>{data.site.groups=G;try{msg("儲存中…");await save(m);msg("");if(after)await after()}catch(err){msg(err.message);await load()}};
+  const ask=(q,d="")=>(prompt(q,d)||"").trim();
+  $("addGrp").onclick=()=>{const n=$("newGrp").value.trim();if(!n)return;if(G.some(g=>g.name===n))return msg("已經有這個大分類");G.push({name:n,subs:[]});commit("新增大分類："+n)};
+  $("newGrp").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();$("addGrp").click()}};
+  const P=$("pCats"),on=(a,f)=>P.querySelectorAll(`[${a}]`).forEach(x=>x.onclick=()=>f(...x.getAttribute(a).split(",").map(Number)));
+  on("data-gmv",(k,d)=>{[G[k],G[k+d]]=[G[k+d],G[k]];commit("調整分類順序")});
+  on("data-gren",k=>{const o=G[k].name,n=ask("大分類新名稱",o);if(!n||n===o)return;if(G.some(g=>g.name===n))return msg("已經有這個大分類");
+    const hit=data.items.filter(i=>groupOf(i)===o);G[k].name=n;hit.forEach(i=>i.group=n);commit(`大分類改名：${o} → ${n}`,async()=>{for(const i of hit)await writePage(i)})});
+  on("data-gdel",k=>{const g=G[k];if(gc(g.name))return msg(`「${g.name}」還有 ${gc(g.name)} 件商品，請先改分類`);if(!confirm(`刪除大分類「${g.name}」和底下的小分類？`))return;G.splice(k,1);commit("刪除大分類："+g.name)});
+  on("data-sadd",k=>{const n=ask(`在「${G[k].name}」新增小分類`);if(!n)return;if(G[k].subs.includes(n))return msg("已經有這個小分類");G[k].subs.push(n);commit(`新增小分類：${G[k].name} / ${n}`)});
+  on("data-smv",(k,j,d)=>{const l=G[k].subs;if(j+d<0||j+d>=l.length)return;[l[j],l[j+d]]=[l[j+d],l[j]];commit("調整小分類順序")});
+  on("data-sren",(k,j)=>{const o=G[k].subs[j],n=ask("小分類新名稱",o);if(!n||n===o)return;if(G[k].subs.includes(n))return msg("已經有這個小分類");
+    const hit=data.items.filter(i=>i.category===o&&groupOf(i)===G[k].name);G[k].subs[j]=n;hit.forEach(i=>{i.category=n;i.group=G[k].name});commit(`小分類改名：${o} → ${n}`,async()=>{for(const i of hit)await writePage(i)})});
+  on("data-sdel",(k,j)=>{const c=G[k].subs[j],n=sc(G[k].name,c);if(n)return msg(`「${c}」還有 ${n} 件商品，請先改分類`);G[k].subs.splice(j,1);commit("刪除小分類："+c)});
 }
 
 // ---------- 設定 ----------

@@ -142,3 +142,12 @@ form .row.acts>*{flex:0 1 auto}
   input,textarea,select{font-size:16px}
 }
 .acts .btn,.acts button{white-space:nowrap}
+.chips.sub{padding-top:0}
+.chips.sub button{font-size:13px;padding:4px 12px;background:transparent}
+.chips.sub button.on{background:var(--fg);color:var(--bg)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--card);flex:none}
+.seg button{border:none;border-radius:0;padding:5px 14px;font-size:14px;background:transparent}
+.seg button.on{background:var(--acc);color:var(--accfg)}
+.chips.grp{padding-bottom:4px}
+.chips.grp button{border:none;background:transparent;font-size:16px;font-weight:700;padding:6px 10px;border-radius:0;color:var(--mute);border-bottom:2px solid transparent}
+.chips.grp button.on{color:var(--fg);border-bottom-color:var(--fg);background:transparent}
