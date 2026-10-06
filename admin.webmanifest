@@ -1,0 +1,2 @@
+{"name":"HYPE 後台","short_name":"HYPE後台","id":"./admin.html","start_url":"./admin.html","scope":"./","display":"standalone","background_color":"#f6f5f2","theme_color":"#141414",
+ "icons":[{"src":"admin-192.png","sizes":"192x192","type":"image/png"},{"src":"admin-512.png","sizes":"512x512","type":"image/png"},{"src":"admin-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}]}

@@ -102,3 +102,43 @@ td.n,th.n{text-align:right}
 .stat b{display:block;font-size:20px}
 .stat span{font-size:12px;color:var(--mute)}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0;overflow-x:auto}
+/* 版面：搜尋列與按鈕 */
+.top .search{margin-left:auto}
+.topbtns{display:flex;gap:8px;align-items:center}
+/* 商品頁：右上圖示、底部固定按鈕 */
+#viewDlg{padding:0}
+.vtop{position:sticky;top:0;height:0;z-index:3}
+.vtop>div{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+.vtop button{width:38px;height:38px;padding:0;justify-content:center;border:none;background:rgba(255,255,255,.9);color:#141414;font-size:16px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.vtop button.on{color:#e0245e}
+.acts{position:sticky;bottom:0;display:flex;gap:8px;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);z-index:3}
+.acts>*{flex:1;justify-content:center}
+form .row.acts{margin:18px -20px -20px;justify-content:flex-end}
+form .row.acts>*{flex:0 1 auto}
+/* 手機 */
+@media(max-width:600px){
+  header{position:static}
+  .top{flex-wrap:wrap;height:auto;padding:10px 0;gap:8px}
+  .top h1{font-size:18px}
+  .top .search{order:3;flex:1 1 100%;max-width:none;margin:0}
+  .chips,.filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding-left:16px;padding-right:16px}
+  .chips::-webkit-scrollbar,.filters::-webkit-scrollbar{display:none}
+  .filters>*{flex:none}
+  .grid{padding:12px 0 40px}
+  .meta{padding:8px 10px}
+  .name{font-size:14px}
+  .fav{width:30px;height:30px;font-size:15px}
+  dialog{width:100%;max-width:100%;height:100%;max-height:100%;margin:0;border-radius:0}
+  #orderDlg,#saleDlg{height:auto;max-height:100%;margin-top:auto;border-radius:16px 16px 0 0}
+  .gal img{max-height:65vh}
+  .dlg{padding:16px}
+  form .row.acts{margin:18px -16px -16px;padding-left:16px;padding-right:16px}
+  form .row.acts>*{flex:1;justify-content:center}
+  .two{gap:0 8px}
+  .stats{grid-template-columns:1fr 1fr}
+  .tabs{overflow-x:auto}
+  .bar{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  .bar button{padding:6px 12px;font-size:14px}
+  input,textarea,select{font-size:16px}
+}
+.acts .btn,.acts button{white-space:nowrap}

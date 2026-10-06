@@ -3,13 +3,15 @@
 <title>HYPE 潮流精品</title>
 <meta name="description" content="潮流精品 · 正品現貨，IG / LINE 詢問">
 <meta property="og:title" content="HYPE 潮流精品"><meta property="og:description" content="潮流精品 · 正品現貨，IG / LINE 詢問"><meta property="og:type" content="website">
+<meta name="theme-color" content="#141414"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="HYPE"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css"></head>
 <body>
 <header>
 <div class="notice" id="notice" hidden></div>
 <div class="wrap">
-  <div class="top"><h1 id="title">HYPE</h1>
-    <div style="display:flex;gap:8px;align-items:center"><input class="search" id="q"><button id="lang" style="padding:7px 12px">EN</button><a class="btn line" id="lineTop" target="_blank" rel="noopener" hidden>LINE</a><a class="btn ig" id="igTop" target="_blank" rel="noopener" hidden>IG</a></div>
+  <div class="top"><h1 id="title">HYPE</h1><input class="search" id="q">
+    <div class="topbtns"><button id="lang" style="padding:7px 12px">EN</button><a class="btn line" id="lineTop" target="_blank" rel="noopener" hidden>LINE</a><a class="btn ig" id="igTop" target="_blank" rel="noopener" hidden>IG</a></div>
   </div>
   <div class="chips" id="chips"></div>
   <div class="filters">
@@ -39,12 +41,12 @@ const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{re
 const CATS=["上衣","外套","褲子","鞋","包","配件","其他"];
 const T={
  zh:{search:"搜尋商品",all:"全部",allCat:"全部類別",allSize:"全部尺寸",new:"最新上架",asc:"價格 低→高",desc:"價格 高→低",avail:"只看可購買",favs:"♥ 收藏",empty:"還沒有商品",nomatch:"沒有符合的商品",nofav:"還沒有收藏，點商品右上角 ♡",loading:"載入中…",fail:"讀取失敗，請重新整理",
-   reserved:"保留中",sold:"已售出",cond:"狀況",size:"尺寸",cat:"類別",share:"分享",askLine:"LINE 詢問",askIg:"IG 私訊詢問",close:"關閉",order:"我要下單",left:n=>`剩 ${n} 件`,similar:"你可能也喜歡",
+   reserved:"保留中",sold:"已售出",cond:"狀況",size:"尺寸",cat:"類別",share:"分享",askLine:"LINE 詢問",askIg:"IG 詢問",close:"關閉",order:"我要下單",left:n=>`剩 ${n} 件`,similar:"你可能也喜歡",
    cpIg:"已複製詢問內容，貼到 IG 私訊即可",cpLine:"已複製詢問內容，貼到 LINE 即可",cpLink:"已複製連結",ask:"你好，想詢問：",
    oTitle:"下單資料",oName:"姓名",oPhone:"電話",oContact:"IG / LINE 帳號",oShip:"取貨方式",oAddr:"門市名稱 / 地址",oNote:"備註",cancel:"取消",send:"送出",sending:"送出中…",sent:"已送出！我們會盡快聯絡你",oFail:"送出失敗，請改用 IG / LINE 聯絡",
    ship:["7-11 店到店","全家店到店","宅配","面交"]},
  en:{search:"Search",all:"All",allCat:"All categories",allSize:"All sizes",new:"Newest",asc:"Price: low → high",desc:"Price: high → low",avail:"Available only",favs:"♥ Saved",empty:"No items yet",nomatch:"No matching items",nofav:"Nothing saved yet — tap ♡ on an item",loading:"Loading…",fail:"Failed to load, please refresh",
-   reserved:"Reserved",sold:"Sold",cond:"Condition",size:"Size",cat:"Category",share:"Share",askLine:"Ask on LINE",askIg:"DM on Instagram",close:"Close",order:"Order",left:n=>`${n} left`,similar:"You may also like",
+   reserved:"Reserved",sold:"Sold",cond:"Condition",size:"Size",cat:"Category",share:"Share",askLine:"Ask on LINE",askIg:"Instagram",close:"Close",order:"Order",left:n=>`${n} left`,similar:"You may also like",
    cpIg:"Message copied — paste it in your Instagram DM",cpLine:"Message copied — paste it in LINE",cpLink:"Link copied",ask:"Hi, I'm interested in: ",
    oTitle:"Order details",oName:"Name",oPhone:"Phone",oContact:"Instagram / LINE ID",oShip:"Delivery",oAddr:"Store / address",oNote:"Notes",cancel:"Cancel",send:"Send",sending:"Sending…",sent:"Sent! We'll contact you soon",oFail:"Failed — please contact us on IG / LINE",
    ship:["7-11 pickup","FamilyMart pickup","Home delivery","Meet in person"]}};
@@ -114,16 +116,18 @@ function openView(it,idx=0){
   if(!it)return;const ph=it.photos||[],s=status(it),fresh=!$("viewDlg").open||$("viewDlg").dataset.id!==it.id;
   $("viewDlg").dataset.id=it.id;history.replaceState(null,"","#"+it.id);if(fresh)count("item/"+it.id,it.brand+" "+it.name);
   const sim=similar(it),fav=favs.has(it.id);
-  $("view").innerHTML=`${ph.length?`<div class="gal"><img id="galImg" src="${esc(ph[idx])}" alt="">${ph.length>1?`<button class="nav l" data-i="${(idx-1+ph.length)%ph.length}">‹</button><button class="nav r" data-i="${(idx+1)%ph.length}">›</button>`:""}</div>${ph.length>1?`<div class="dots">${ph.map((_,k)=>`<span class="${k===idx?"on":""}"></span>`).join("")}</div>`:""}`:""}
+  $("view").innerHTML=`<div class="vtop"><div><button id="vFav" class="${fav?"on":""}" aria-label="收藏">${fav?"♥":"♡"}</button><button id="share" aria-label="${t("share")}">⤴</button><button id="close" aria-label="${t("close")}">✕</button></div></div>${ph.length?`<div class="gal"><img id="galImg" src="${esc(ph[idx])}" alt="">${ph.length>1?`<button class="nav l" data-i="${(idx-1+ph.length)%ph.length}">‹</button><button class="nav r" data-i="${(idx+1)%ph.length}">›</button>`:""}</div>${ph.length>1?`<div class="dots">${ph.map((_,k)=>`<span class="${k===idx?"on":""}"></span>`).join("")}</div>`:""}`:""}
   <div class="dlg ${s==="sold"?"sold":""}"><div class="brand">${esc(it.brand)}${s!=="available"?` · <span style="color:${s==="sold"?"var(--danger)":"#d98a00"}">${t(s)}</span>`:""}${isNew(it)?` · <span style="color:#1d6fe0">NEW</span>`:""}</div>
   <h2 style="margin:4px 0">${esc(it.name)}</h2><div class="price">${fmt(it.price)}${off(it)?`<span class="orig">${fmt(it.origPrice)}</span> <span style="color:var(--danger);font-size:13px">-${off(it)}%</span>`:""}</div>
   <div class="tags">${[["cond",it.condition],["size",it.size],["cat",it.category]].filter(x=>x[1]).map(x=>`<span class="tag">${t(x[0])}：${esc(tr(x[1]))}</span>`).join("")}${it.qty>1&&s!=="sold"?`<span class="stock">${t("left")(it.qty)}</span>`:""}</div>
   <div class="desc">${esc(it.desc)}</div>
-  <div class="row"><button id="vFav">${fav?"♥":"♡"}</button><button id="share">${t("share")}</button>${s!=="sold"&&site.line?`<button class="btn line" id="askLine">${t("askLine")}</button>`:""}${s!=="sold"&&site.ig?`<button class="btn ig" id="ask">${t("askIg")}</button>`:""}${s==="available"&&site.formspree?`<button class="pri" id="orderBtn">${t("order")}</button>`:""}<button id="close">${t("close")}</button></div>
-  ${sim.length?`<div class="sec">${t("similar")}</div><div class="sim">${sim.map(i=>card(i,false)).join("")}</div>`:""}</div>`;
+  ${sim.length?`<div class="sec">${t("similar")}</div><div class="sim">${sim.map(i=>card(i,false)).join("")}</div>`:""}</div>
+  ${s!=="sold"&&(site.line||site.ig||site.formspree)?`<div class="acts">${site.line?`<button class="btn line" id="askLine">${t("askLine")}</button>`:""}${site.ig?`<button class="btn ig" id="ask">${t("askIg")}</button>`:""}${s==="available"&&site.formspree?`<button class="pri" id="orderBtn">${t("order")}</button>`:""}</div>`:""}`;
   $("view").querySelectorAll(".nav").forEach(b=>b.onclick=()=>openView(it,+b.dataset.i));
   $("view").querySelectorAll(".sim .card").forEach(c=>c.onclick=()=>{openView(items.find(i=>i.id===c.dataset.id));$("viewDlg").scrollTop=0});
-  if($("galImg"))$("galImg").onclick=()=>openZoom(ph[idx]);
+  if($("galImg")){$("galImg").onclick=()=>openZoom(ph[idx]);
+    let sx=null;const g=$("view").querySelector(".gal");g.ontouchstart=e=>{sx=e.touches[0].clientX};
+    g.ontouchend=e=>{if(sx==null||ph.length<2)return;const dx=e.changedTouches[0].clientX-sx;sx=null;if(Math.abs(dx)>40)openView(it,(idx+(dx<0?1:-1)+ph.length)%ph.length)}}
   $("close").onclick=()=>$("viewDlg").close();
   $("vFav").onclick=()=>{toggleFav(it.id);openView(it,idx)};
   const msg=`${t("ask")}${it.brand} ${it.name}${it.size?" / "+it.size:""}${it.price?"（"+fmt(it.price)+"）":""}\n${shareUrl(it)}`;
@@ -167,6 +171,7 @@ function seo(){
   document.head.append(s);
 }
 applyLang();$("empty").textContent=t("loading");
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 fetch("data.json?t="+Date.now()).then(r=>r.json()).then(d=>{
   site=d.site||{};items=d.items||[];
   if(site.title){$("title").textContent=site.title;document.title=site.title}

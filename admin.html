@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><title>HYPE 後台</title><link rel="stylesheet" href="style.css"></head>
+<meta name="robots" content="noindex"><title>HYPE 後台</title>
+<meta name="theme-color" content="#141414"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="HYPE後台"><link rel="manifest" href="admin.webmanifest"><link rel="apple-touch-icon" href="admin-180.png"><link rel="icon" href="admin-192.png">
+<link rel="stylesheet" href="style.css"></head>
 <body>
 <header><div class="wrap">
   <div class="top"><h1>後台</h1>
@@ -36,11 +39,11 @@
   </div>
   <div id="costHint" style="font-size:12px;color:var(--mute)" hidden>到「銷售紀錄」解鎖後才能填成本</div>
   <label>描述</label><textarea id="fDesc" placeholder="尺寸細節、購入管道…"></textarea>
-  <label>照片（拖曳或用 ← → 排序，第一張為封面）</label><input id="fPhotos" type="file" accept="image/*" multiple>
+  <label>照片（拖曳或用 ← → 排序，第一張為封面）</label><label class="btn" for="fPhotos" style="display:inline-flex;color:var(--fg);margin:0;cursor:pointer">＋ 加照片</label><input id="fPhotos" type="file" accept="image/*" multiple hidden>
   <div class="thumbs" id="thumbs"></div>
   <div class="msg" id="fMsg"></div>
   <div class="row" id="editRow" hidden style="justify-content:flex-start"><button type="button" id="sellBtn">記錄成交</button><button type="button" id="igPost">IG 貼文圖</button><button type="button" id="dup">複製商品</button><button type="button" class="danger" id="del">刪除</button></div>
-  <div class="row"><button type="button" id="cancel">取消</button><button class="pri" id="save" type="submit">發布</button></div>
+  <div class="row acts"><button type="button" id="cancel">取消</button><button class="pri" id="save" type="submit">發布</button></div>
 </form></dialog>
 
 <dialog id="saleDlg"><form class="dlg" id="saleForm" method="dialog">
@@ -76,7 +79,7 @@
   <div id="gcLink" style="font-size:13px;margin-top:4px"></div>
   <label>品牌 Logo</label><div id="logoList"></div>
   <div class="msg" id="sMsg"></div>
-  <div class="row"><button type="button" id="logout">登出</button><button type="button" id="sCancel">取消</button><button class="pri" type="submit">儲存</button></div>
+  <div class="row acts"><button type="button" id="logout">登出</button><button type="button" id="sCancel">取消</button><button class="pri" type="submit">儲存</button></div>
 </form></dialog>
 
 <script>
@@ -372,5 +375,6 @@ async function start(){
 }
 $("loginBtn").onclick=()=>{token=$("tok").value.trim();if(token)start()};
 start();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body></html>
