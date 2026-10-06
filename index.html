@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HYPE 潮流精品</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><div class="wrap">
+  <div class="top"><h1 id="title">HYPE</h1>
+    <div style="display:flex;gap:8px;align-items:center"><input class="search" id="q" placeholder="搜尋商品"><a class="btn ig" id="igTop" target="_blank" rel="noopener" hidden>IG</a></div>
+  </div>
+  <div class="chips" id="chips"></div>
+</div></header>
+<main class="wrap"><div class="grid" id="grid"></div><div class="empty" id="empty">載入中…</div></main>
+<dialog id="viewDlg"><div id="view"></div></dialog>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>n||n===0?"NT$ "+Number(n).toLocaleString():"";
+let site={},items=[],brand="全部",onlyAvail=false;
+
+function render(){
+  const brands=[...new Set(items.map(i=>i.brand))].sort((a,b)=>a.localeCompare(b));
+  $("chips").innerHTML=["全部",...brands].map(b=>`<button class="${b===brand?"on":""}" data-b="${esc(b)}">${esc(b)}${b==="全部"?"":" · "+items.filter(i=>i.brand===b).length}</button>`).join("")
+    +`<span class="sep"></span><button class="${onlyAvail?"on":""}" data-a="1">只看可購買</button>`;
+  const q=$("q").value.trim().toLowerCase();
+  const list=items.filter(i=>(brand==="全部"||i.brand===brand)&&(!onlyAvail||!i.sold)&&(!q||(i.name+i.brand+(i.desc||"")).toLowerCase().includes(q)));
+  $("grid").innerHTML=list.map(i=>`<div class="card${i.sold?" sold":""}" data-id="${esc(i.id)}">
+    ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
+    ${i.sold?`<span class="badge">SOLD</span>`:""}
+    <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}</div></div></div>`).join("");
+  $("empty").hidden=list.length>0;$("empty").textContent=items.length?"沒有符合的商品":"還沒有商品";
+}
+$("chips").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.a)onlyAvail=!onlyAvail;else brand=b.dataset.b;render()};
+$("q").oninput=render;
+$("grid").onclick=e=>{const c=e.target.closest(".card");if(c)openView(items.find(i=>i.id===c.dataset.id))};
+
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2200)}
+
+function openView(it,idx=0){
+  if(!it)return;const ph=it.photos||[];
+  $("view").innerHTML=`${ph.length?`<div class="gal"><img src="${esc(ph[idx])}" alt="">${ph.length>1?`<button class="nav l" data-i="${(idx-1+ph.length)%ph.length}">‹</button><button class="nav r" data-i="${(idx+1)%ph.length}">›</button>`:""}</div>${ph.length>1?`<div class="dots">${ph.map((_,k)=>`<span class="${k===idx?"on":""}"></span>`).join("")}</div>`:""}`:""}
+  <div class="dlg ${it.sold?"sold":""}"><div class="brand">${esc(it.brand)}${it.sold?` · <span style="color:var(--danger)">已售出</span>`:""}</div><h2 style="margin:4px 0">${esc(it.name)}</h2><div class="price">${fmt(it.price)}</div><div class="desc">${esc(it.desc)}</div>
+  <div class="row">${site.ig&&!it.sold?`<button class="btn ig" id="ask">IG 私訊詢問</button>`:""}<button class="pri" id="close">關閉</button></div></div>`;
+  $("view").querySelectorAll(".nav").forEach(b=>b.onclick=()=>openView(it,+b.dataset.i));
+  $("close").onclick=()=>$("viewDlg").close();
+  if($("ask"))$("ask").onclick=async()=>{
+    const txt=`你好，想詢問：${it.brand} ${it.name}${it.price?"（"+fmt(it.price)+"）":""}\n${location.origin+location.pathname}#${it.id}`;
+    try{await navigator.clipboard.writeText(txt);toast("已複製詢問內容，貼到 IG 私訊即可")}catch{}
+    window.open("https://ig.me/m/"+encodeURIComponent(site.ig),"_blank","noopener");
+  };
+  if(!$("viewDlg").open)$("viewDlg").showModal();
+}
+
+fetch("data.json?t="+Date.now()).then(r=>r.json()).then(d=>{
+  site=d.site||{};items=(d.items||[]).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(site.title){$("title").textContent=site.title;document.title=site.title}
+  if(site.ig){$("igTop").hidden=false;$("igTop").href="https://instagram.com/"+encodeURIComponent(site.ig)}
+  render();
+  const h=decodeURIComponent(location.hash.slice(1));if(h)openView(items.find(i=>i.id===h));
+}).catch(()=>{$("empty").textContent="讀取失敗，請重新整理"});
+</script>
+</body></html>
