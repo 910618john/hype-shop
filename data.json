@@ -1,7 +1,14 @@
 {
   "site": {
     "title": "HYPE",
-    "ig": ""
+    "ig": "",
+    "notice": "",
+    "line": "",
+    "watermark": true,
+    "wmText": "",
+    "formspree": "",
+    "goatcounter": "hypeshop",
+    "logos": {}
   },
   "items": []
 }
