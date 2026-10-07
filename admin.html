@@ -7,9 +7,9 @@
 <body>
 <header><div class="wrap">
   <div class="top"><h1>後台 <small id="me" style="font-size:13px;font-weight:500;color:var(--mute);letter-spacing:0"></small></h1>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="themeBtn" type="button">🌙</button><a class="btn" href="./" target="_blank">看前台</a><button id="setBtn" hidden>設定</button><button class="pri" id="addBtn" hidden>＋ 發布</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="themeBtn" type="button">🌙</button><a class="btn" href="./" target="_blank">看前台</a><button id="setBtn" class="admOnly" hidden>設定</button><button class="pri" id="addBtn" hidden>＋ 發布</button></div>
   </div>
-  <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="brands">品牌</button><button data-tab="cats">分類</button><button data-tab="sales">銷售紀錄</button><span style="flex:1"></span><button id="csvItems">匯出商品 CSV</button></div>
+  <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="brands" class="admOnly">品牌</button><button data-tab="cats" class="admOnly">分類</button><button data-tab="sales" class="admOnly">銷售紀錄</button><span style="flex:1"></span><button id="csvItems" class="admOnly">匯出商品 CSV</button></div>
 </div></header>
 <main class="wrap">
   <div id="login" class="dlg" style="max-width:480px;margin:40px auto" hidden>
@@ -49,7 +49,7 @@
   <label>照片（拖曳或用 ← → 排序，第一張為封面）</label><label class="btn" for="fPhotos" style="display:inline-flex;color:var(--fg);margin:0;cursor:pointer">＋ 加照片</label><input id="fPhotos" type="file" accept="image/*" multiple hidden>
   <div class="thumbs" id="thumbs"></div>
   <div class="msg" id="fMsg"></div>
-  <div class="row" id="editRow" hidden style="justify-content:flex-start"><button type="button" id="sellBtn">記錄成交</button><button type="button" id="igPost">IG 貼文圖</button><button type="button" id="dup">複製商品</button><button type="button" class="danger" id="del">刪除</button></div>
+  <div class="row" id="editRow" hidden style="justify-content:flex-start"><button type="button" id="sellBtn" class="admOnly">記錄成交</button><button type="button" id="igPost">IG 貼文圖</button><button type="button" id="dup">複製商品</button><button type="button" class="danger" id="del">刪除</button></div>
   <div class="row acts"><button type="button" id="cancel">取消</button><button class="pri" id="save" type="submit">發布</button></div>
 </form></dialog>
 
@@ -95,6 +95,8 @@
   <label>瀏覽統計 GoatCounter 代碼（<b>代碼</b>.goatcounter.com）</label><input id="sGc" placeholder="hypeshop">
   <div id="gcLink" style="font-size:13px;margin-top:4px"></div><div style="margin-top:6px"><button type="button" id="viewsBtn" style="padding:4px 12px;font-size:13px">🔥 立即更新熱門</button> <span id="viewsMsg" style="font-size:12px;color:var(--mute)"></span></div>
   <div class="msg" id="sMsg"></div>
+  <label>管理員（GitHub 帳號，一行一個；你自己永遠是管理員）</label><textarea id="sAdmins" style="min-height:70px" placeholder="例：friend123"></textarea>
+  <div style="font-size:12px;color:var(--mute)">其他被邀請的人是「一般成員」：只能發布、編輯、刪除自己的商品，看不到品牌、分類、銷售紀錄、設定。</div>
   <label>手機登入用</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button type="button" id="copyTok">📋 複製 Token</button><span style="font-size:12px;color:var(--mute)">複製後用 LINE 傳給自己，再貼到手機後台</span></div>
   <div class="row acts"><button type="button" id="logout">登出</button><button type="button" id="sCancel">取消</button><button class="pri" type="submit">儲存</button></div>
 </form></dialog>
@@ -187,8 +189,15 @@ ${img?`<meta property="og:image" content="${esc(img)}"><meta name="twitter:card"
 const writePage=i=>i.hidden?delFile("p/"+i.id+".html"):putFile("p/"+i.id+".html",b64utf8(productPage(i)),"商品頁："+i.name).catch(()=>{});
 const writeSitemap=()=>putFile("sitemap.xml",b64utf8(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n<url><loc>${BASE}</loc></url>\n${data.items.filter(i=>!i.hidden).map(i=>`<url><loc>${BASE}p/${i.id}.html</loc></url>`).join("\n")}\n</urlset>\n`),"更新 sitemap").catch(()=>{});
 
+// ---------- 權限（介面限制） ----------
+const lc=v=>String(v||"").toLowerCase();
+const isAdm=()=>!me||lc(me)===lc(OWNER)||(data.site.admins||[]).some(a=>lc(a)===lc(me));
+const canEdit=i=>isAdm()||(!!i&&!!me&&i.by===me);
+function applyRole(){const a=isAdm();document.querySelectorAll(".admOnly").forEach(e=>{if(e.id==="setBtn"&&$("tabs").hidden)return;e.hidden=!a});
+  $("me").textContent=me?`@${me} · ${a?"管理員":"成員"}`:"";if(!a&&tab!=="items"){tab="items";setTab("items")}}
 // ---------- 商品列表 ----------
 function render(){
+  applyRole();
   const who=[...new Set(data.items.map(i=>i.by||""))];
   $("byBar").hidden=who.length<2&&!who.some(w=>w&&w!==me);
   $("byF").innerHTML=`<option value="">全部發布者（${data.items.length}）</option>`+(me?`<option value="@me">只看我發的（${data.items.filter(i=>i.by===me).length}）</option>`:"")+who.filter(w=>w!==me).map(w=>`<option value="${esc(w)}">${w?"@"+esc(w):"未記錄"}（${data.items.filter(i=>(i.by||"")===w).length}）</option>`).join("");$("byF").value=byF;if($("byF").value!==byF){byF="";$("byF").value=""}
@@ -197,25 +206,25 @@ function render(){
   $("sizeList").innerHTML=[...new Set([...SIZES,...items.map(i=>i.size).filter(Boolean)])].map(s=>`<option value="${esc(s)}">`).join("");
   $("grid").innerHTML=items.map(i=>{const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
     ${i.photos?.[0]?`<img class="ph" loading="lazy" decoding="async" src="${esc(th(i.photos[0])||i.photos[0])}" data-full="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
-    <input type="checkbox" class="chk" data-chk="${esc(i.id)}"${sel.has(i.id)?" checked":""}>
+    ${canEdit(i)?`<input type="checkbox" class="chk" data-chk="${esc(i.id)}"${sel.has(i.id)?" checked":""}>`:""}
     <div class="badges">${i.hidden?`<span class="badge" style="background:#6b6b6b">草稿</span>`:""}${s==="sold"?`<span class="badge">SOLD</span>`:s==="reserved"?`<span class="badge reserved">保留中</span>`:""}</div>
     <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${i.qty>1?` <span class="stock">×${i.qty}</span>`:""}</div><div style="font-size:12px;color:var(--mute)">${i.by?`👤 ${esc(i.by)} `:""}${i.hot?"🔥 ":""}${(data.site.views||{})[i.id]!=null?"👁 "+data.site.views[i.id]:""}${i.saleEnd?` ⏰ 到 ${new Date(i.saleEnd).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`:""}</div>
-    <select data-st="${esc(i.id)}">${Object.entries(ST).map(([k,v])=>`<option value="${k}"${k===s?" selected":""}>${v}</option>`).join("")}</select></div></div>`}).join("");
+    <select data-st="${esc(i.id)}"${canEdit(i)?"":" disabled"}>${Object.entries(ST).map(([k,v])=>`<option value="${k}"${k===s?" selected":""}>${v}</option>`).join("")}</select></div></div>`}).join("");
   $("empty").hidden=items.length>0;
   for(const id of sel)if(!data.items.some(i=>i.id===id))sel.delete(id);
   $("bar").hidden=!sel.size||tab!=="items";$("selN").textContent=`已選 ${sel.size} 件`;
   if(tab==="sales")renderSales();if(tab==="brands")renderBrands();if(tab==="cats")renderCats();
 }
-$("grid").onclick=e=>{if(e.target.closest("select,.chk"))return;const c=e.target.closest(".card");if(c)openForm(data.items.find(i=>i.id===c.dataset.id))};
+$("grid").onclick=e=>{if(e.target.closest("select,.chk"))return;const c=e.target.closest(".card");if(!c)return;const it=data.items.find(i=>i.id===c.dataset.id);if(!canEdit(it))return alert(`這是 @${it.by||"其他人"} 發布的商品，只有發布者或管理員可以編輯`);openForm(it)};
 $("grid").onchange=async e=>{
   const c=e.target.closest("[data-chk]");if(c){c.checked?sel.add(c.dataset.chk):sel.delete(c.dataset.chk);render();return}
-  const sl=e.target.closest("[data-st]");if(!sl)return;const it=data.items.find(i=>i.id===sl.dataset.st);if(!it)return render();const old=status(it);
+  const sl=e.target.closest("[data-st]");if(!sl)return;const it=data.items.find(i=>i.id===sl.dataset.st);if(!it||!canEdit(it))return render();const old=status(it);
   sl.disabled=true;it.status=sl.value;delete it.sold;
   try{await save(ST[it.status]+"："+it.name);writePage(it)}catch(err){it.status=old;alert(err.message);render()}
 };
 $("bar").onclick=async e=>{
   const a=e.target.dataset.batch;if(!a)return;if(a==="none"){sel.clear();render();return}
-  const list=data.items.filter(i=>sel.has(i.id));if(!list.length)return;
+  const list=data.items.filter(i=>sel.has(i.id)&&canEdit(i));if(!list.length)return;sel=new Set(list.map(i=>i.id));
   if(a==="delete"){if(!confirm(`確定刪除 ${list.length} 件商品？`))return;data.items=data.items.filter(i=>!sel.has(i.id))}
   else list.forEach(i=>{i.status=a;delete i.sold});
   $("bar").querySelectorAll("button").forEach(b=>b.disabled=true);
@@ -284,6 +293,7 @@ $("form").onsubmit=async e=>{
   $("save").disabled=true;$("fMsg").textContent="儲存中…";
   let it=editing&&data.items.find(i=>i.id===editing.id);
   if(editing&&!it){$("save").disabled=false;return $("fMsg").textContent="這件商品已被刪除，請關閉視窗"}
+  if(it&&!canEdit(it)){$("save").disabled=false;return $("fMsg").textContent="只有發布者或管理員可以編輯"}
   const removed=(it?.photos||[]).filter(p=>!v.photos.includes(p)),isNewItem=!it,wasHidden=!!it?.hidden;
   try{
     if(it){Object.assign(it,v);delete it.sold}else{it={id:Date.now().toString(36),createdAt:Date.now(),by:me||undefined,...v};data.items.push(it)}if(isNewItem===false&&me)it.editedBy=me;
@@ -296,7 +306,7 @@ $("form").onsubmit=async e=>{
 };
 $("del").onclick=async()=>{
   if(!editing||!confirm("確定刪除「"+editing.name+"」？"))return;
-  const it=data.items.find(i=>i.id===editing.id);if(!it)return $("formDlg").close();data.items=data.items.filter(i=>i!==it);
+  const it=data.items.find(i=>i.id===editing.id);if(!it)return $("formDlg").close();if(!canEdit(it))return $("fMsg").textContent="只有發布者或管理員可以刪除";data.items=data.items.filter(i=>i!==it);
   try{await save("刪除："+it.name);$("formDlg").close();await delFile("p/"+it.id+".html");await cleanup(it.photos||[]);await writeSitemap()}
   catch(err){data.items.push(it);$("fMsg").textContent="刪除失敗："+err.message}
 };
@@ -304,6 +314,7 @@ $("del").onclick=async()=>{
 // ---------- 記錄成交 ----------
 let saleFor=null;
 $("sellBtn").onclick=()=>{
+  if(!isAdm())return;
   if(privState!=="open"){alert("請先到「銷售紀錄」"+(privState==="none"?"設定密碼":"輸入密碼解鎖"));$("formDlg").close();setTab("sales");return}
   saleFor=editing;$("saleItem").textContent=`${saleFor.brand} ${saleFor.name}${saleFor.size?" / "+saleFor.size:""}`;
   $("sPrice").value=saleFor.price??"";$("sCost").value=priv.costs[saleFor.id]??"";$("sQty").value=1;$("sQty").max=Math.max(1,saleFor.qty??1);
@@ -533,7 +544,7 @@ async function refreshViews(force){
 
 // ---------- 設定 ----------
 $("sGc").oninput=()=>{const v=$("sGc").value.trim();$("gcLink").innerHTML=v?`<a href="https://${esc(v)}.goatcounter.com" target="_blank" rel="noopener">→ 查看瀏覽統計</a>`:`<a href="https://www.goatcounter.com/signup" target="_blank" rel="noopener">→ 免費申請 GoatCounter</a>`};
-$("setBtn").onclick=()=>{const s=data.site;$("sTitle").value=s.title||"";$("sNotice").value=s.notice||"";$("sInfo").value=s.info||"";$("sIg").value=s.ig||"";$("sLine").value=s.line||"";$("sWm").checked=s.watermark!==false;$("sWmText").value=s.wmText||"";
+$("setBtn").onclick=()=>{if(!isAdm())return;const s=data.site;$("sAdmins").value=(s.admins||[]).join("\n");$("sTitle").value=s.title||"";$("sNotice").value=s.notice||"";$("sInfo").value=s.info||"";$("sIg").value=s.ig||"";$("sLine").value=s.line||"";$("sWm").checked=s.watermark!==false;$("sWmText").value=s.wmText||"";
   $("sForm").value=s.formspree||"";$("sGc").value=s.goatcounter||"";$("sGc").oninput();$("sMsg").textContent="";$("setDlg").showModal()};
 $("sCancel").onclick=()=>$("setDlg").close();
 const INFO_TPL=`# 付款方式
@@ -557,7 +568,7 @@ const INFO_TPL=`# 付款方式
 - 可以議價嗎？歡迎私訊詢問
 - 可以保留嗎？付訂金可保留 3 天`;
 $("infoTpl").onclick=()=>{if(!$("sInfo").value.trim()||confirm("覆蓋目前內容？"))$("sInfo").value=INFO_TPL};
-$("setForm").onsubmit=async e=>{e.preventDefault();const s=data.site;
+$("setForm").onsubmit=async e=>{e.preventDefault();if(!isAdm())return;const s=data.site;s.admins=[...new Set($("sAdmins").value.split(/[\s,，]+/).map(x=>x.trim().replace(/^@/,"")).filter(Boolean))];
   Object.assign(s,{title:$("sTitle").value.trim(),notice:$("sNotice").value.trim(),info:$("sInfo").value.trim(),ig:$("sIg").value.trim().replace(/^@/,""),line:$("sLine").value.trim(),watermark:$("sWm").checked,wmText:$("sWmText").value.trim(),
     formspree:(v=>/^https?:/.test(v)&&!/formspree\.io/.test(v)?v:v.replace(/^.*\/f\//,""))($("sForm").value.trim()),goatcounter:$("sGc").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\.goatcounter\.com.*$/,"")});
   try{await save("更新網站設定");$("setDlg").close()}catch(err){$("sMsg").textContent=err.message}};
@@ -568,8 +579,8 @@ $("logout").onclick=async()=>{ls.set("gh_token","");ls.set("hs_pass","");await k
 
 async function start(){
   if(!token){$("login").hidden=false;return}
-  try{const u=await fetch("https://api.github.com/user",{headers:{Authorization:"Bearer "+token,Accept:"application/vnd.github+json"},cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);me=u?.login||"";$("me").textContent=me?"@"+me:"";
-    await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render();expireSales().then(()=>refreshViews())}
+  try{const u=await fetch("https://api.github.com/user",{headers:{Authorization:"Bearer "+token,Accept:"application/vnd.github+json"},cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);me=u?.login||"";
+    await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("tabs").hidden=false;$("setBtn").hidden=!isAdm();ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render();expireSales().then(()=>refreshViews())}
   catch(err){$("login").hidden=false;$("lMsg").textContent="登入失敗："+err.message}
 }
 $("pasteBtn").onclick=async()=>{try{const v=(await navigator.clipboard.readText()).trim();if(v){$("tok").value=v;token=v;start()}}catch{$("tok").focus();$("lMsg").textContent="無法讀取剪貼簿，請長按輸入框貼上"}};
