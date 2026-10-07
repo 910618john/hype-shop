@@ -16,7 +16,8 @@
     <h2>登入</h2>
     <label>GitHub Token（Contents 讀寫權限）</label><input id="tok" type="password" autocomplete="off">
     <div class="msg" id="lMsg"></div>
-    <div class="row"><button class="pri" id="loginBtn">登入</button></div>
+    <div style="font-size:12px;color:var(--mute);margin-top:6px">iPhone 建議從「加入主畫面」的 App 登入，只要輸入一次</div>
+    <div class="row"><button type="button" id="pasteBtn">📋 貼上</button><button class="pri" id="loginBtn">登入</button></div>
   </div>
   <section id="pItems"><div class="grid" id="grid"></div><div class="empty" id="empty" hidden>還沒有商品，按「＋ 發布」</div></section>
   <section id="pBrands" hidden></section>
@@ -528,6 +529,7 @@ async function start(){
   try{await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render()}
   catch(err){$("login").hidden=false;$("lMsg").textContent="登入失敗："+err.message}
 }
+$("pasteBtn").onclick=async()=>{try{const v=(await navigator.clipboard.readText()).trim();if(v){$("tok").value=v;token=v;start()}}catch{$("tok").focus();$("lMsg").textContent="無法讀取剪貼簿，請長按輸入框貼上"}};
 $("loginBtn").onclick=()=>{token=$("tok").value.trim();if(token)start()};
 start();
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
