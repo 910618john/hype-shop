@@ -10,8 +10,8 @@
 <header>
 <div class="notice" id="notice" hidden></div>
 <div class="wrap">
-  <div class="top"><h1 id="title">HYPE</h1><input class="search" id="q">
-    <div class="topbtns"><button id="infoBtn" hidden style="padding:7px 12px"></button><button class="themeBtn" type="button">☾</button><button id="lang" style="padding:7px 12px">EN</button><a class="btn line" id="lineTop" target="_blank" rel="noopener" hidden>LINE</a><a class="btn ig" id="igTop" target="_blank" rel="noopener" hidden>IG</a></div>
+  <div class="top"><button class="menuBtn" id="menuBtn" type="button" aria-label="選單"><span></span><span></span><span></span></button><h1 id="title">HYPE</h1><input class="search" id="q">
+    <div class="topbtns"><button id="infoBtn" hidden style="padding:7px 12px"></button><button class="themeBtn" type="button">🌙</button><button id="lang" style="padding:7px 12px">EN</button><a class="btn line" id="lineTop" target="_blank" rel="noopener" hidden>LINE</a><a class="btn ig" id="igTop" target="_blank" rel="noopener" hidden>IG</a></div>
   </div>
   <div class="chips grp" id="grpChips"></div>
   <div class="chips sub" id="catChips"></div>
@@ -21,6 +21,7 @@
     <button id="fAvail"></button><button id="fFav"></button>
   </div>
 </div></header>
+<dialog id="menu" class="drawer"><div class="dhead"><b id="mTitle">HYPE</b><button id="mClose" type="button" aria-label="關閉">✕</button></div><nav id="mBody"></nav></dialog>
 <main class="wrap"><div id="recent"></div><div class="logos" id="logos"></div><div class="grid" id="grid"></div><div class="empty" id="empty"></div></main>
 <footer class="wrap foot" id="foot"></footer>
 <dialog id="infoDlg"><div class="dlg"><div id="infoBody" class="md"></div><div class="row"><button class="pri" id="infoClose"></button></div></div></dialog>
@@ -45,12 +46,12 @@ const fmt=n=>n||n===0?"NT$ "+Number(n).toLocaleString():"";
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const GROUPS=[{name:"衣服",subs:["上衣","襯衫","帽T / 衛衣","針織 / 毛衣","外套","褲子","短褲"]},{name:"鞋子",subs:["球鞋","靴子","拖鞋 / 涼鞋","皮鞋"]},{name:"飾品",subs:["項鍊","手環","戒指","耳環","手錶"]},{name:"包包",subs:["後背包","側背包","托特包","皮夾"]},{name:"配件",subs:["帽子","皮帶","襪子","其他"]}],NEWC=["全新未拆","全新"];
 const T={
- zh:{search:"搜尋商品",all:"全部",allCat:"全部類別",allCond:"全部",price:["全部價格","NT$ 1,000 以下","1,000–3,000","3,000–10,000","10,000 以上"],recent:"最近瀏覽",info:"購物須知",sizeChart:"尺寸表",newC:"全新",usedC:"二手",allSize:"全部尺寸",new:"最新上架",asc:"價格 低→高",desc:"價格 高→低",avail:"只看可購買",favs:"♥ 收藏",empty:"還沒有商品",nomatch:"沒有符合的商品",nofav:"還沒有收藏，點商品右上角 ♡",loading:"載入中…",fail:"讀取失敗，請重新整理",
+ zh:{search:"搜尋商品",all:"全部",allCat:"全部類別",allCond:"全部",price:["全部價格","NT$ 1,000 以下","1,000–3,000","3,000–10,000","10,000 以上"],recent:"最近瀏覽",mAll:"全部商品",mCats:"分類",mBrands:"品牌",mMore:"更多",mContact:"聯絡我們",info:"購物須知",sizeChart:"尺寸表",newC:"全新",usedC:"二手",allSize:"全部尺寸",new:"最新上架",asc:"價格 低→高",desc:"價格 高→低",avail:"只看可購買",favs:"♥ 收藏",empty:"還沒有商品",nomatch:"沒有符合的商品",nofav:"還沒有收藏，點商品右上角 ♡",loading:"載入中…",fail:"讀取失敗，請重新整理",
    reserved:"保留中",sold:"已售出",cond:"狀況",size:"尺寸",cat:"類別",share:"分享",askLine:"LINE 詢問",askIg:"IG 詢問",close:"關閉",order:"我要下單",left:n=>`剩 ${n} 件`,similar:"你可能也喜歡",
    cpIg:"已複製詢問內容，貼到 IG 私訊即可",cpLine:"已複製詢問內容，貼到 LINE 即可",cpLink:"已複製連結",ask:"你好，想詢問：",
    oTitle:"下單資料",oName:"姓名",oPhone:"電話",oContact:"IG / LINE 帳號",oShip:"取貨方式",oAddr:"門市名稱 / 地址",oNote:"備註",cancel:"取消",send:"送出",sending:"送出中…",sent:"已送出！我們會盡快聯絡你",oFail:"送出失敗，請改用 IG / LINE 聯絡",
    ship:["7-11 店到店","全家店到店","宅配","面交"]},
- en:{search:"Search",all:"All",allCat:"All categories",allCond:"All",price:["Any price","Under NT$1,000","1,000–3,000","3,000–10,000","Over 10,000"],recent:"Recently viewed",info:"Shopping info",sizeChart:"Size chart",newC:"New",usedC:"Pre-owned",allSize:"All sizes",new:"Newest",asc:"Price: low → high",desc:"Price: high → low",avail:"Available only",favs:"♥ Saved",empty:"No items yet",nomatch:"No matching items",nofav:"Nothing saved yet — tap ♡ on an item",loading:"Loading…",fail:"Failed to load, please refresh",
+ en:{search:"Search",all:"All",allCat:"All categories",allCond:"All",price:["Any price","Under NT$1,000","1,000–3,000","3,000–10,000","Over 10,000"],recent:"Recently viewed",mAll:"All items",mCats:"Categories",mBrands:"Brands",mMore:"More",mContact:"Contact",info:"Shopping info",sizeChart:"Size chart",newC:"New",usedC:"Pre-owned",allSize:"All sizes",new:"Newest",asc:"Price: low → high",desc:"Price: high → low",avail:"Available only",favs:"♥ Saved",empty:"No items yet",nomatch:"No matching items",nofav:"Nothing saved yet — tap ♡ on an item",loading:"Loading…",fail:"Failed to load, please refresh",
    reserved:"Reserved",sold:"Sold",cond:"Condition",size:"Size",cat:"Category",share:"Share",askLine:"Ask on LINE",askIg:"Instagram",close:"Close",order:"Order",left:n=>`${n} left`,similar:"You may also like",
    cpIg:"Message copied — paste it in your Instagram DM",cpLine:"Message copied — paste it in LINE",cpLink:"Link copied",ask:"Hi, I'm interested in: ",
    oTitle:"Order details",oName:"Name",oPhone:"Phone",oContact:"Instagram / LINE ID",oShip:"Delivery",oAddr:"Store / address",oNote:"Notes",cancel:"Cancel",send:"Send",sending:"Sending…",sent:"Sent! We'll contact you soon",oFail:"Failed — please contact us on IG / LINE",
@@ -194,6 +195,34 @@ function foot(){const L=[];if(site.info)L.push(`<a href="#" id="footInfo">${t("i
   $("foot").innerHTML=`<div>${L.join(" · ")}</div><div style="margin-top:6px">© ${new Date().getFullYear()} ${esc(site.title||"HYPE")}</div>`;if($("footInfo"))$("footInfo").onclick=e=>{e.preventDefault();openInfo()}}
 function openInfo(){$("infoBody").innerHTML=`<h2>${t("info")}</h2>`+mdHtml(site.info||"");$("infoDlg").showModal()}
 $("infoBtn").onclick=openInfo;$("infoClose").onclick=()=>$("infoDlg").close();$("sizeClose").onclick=()=>$("sizeDlg").close();
+// ---------- 左上角選單 ----------
+function openMenu(){
+  const n=f=>items.filter(f).length,gl=groups().filter(g=>n(i=>groupOf(i)===g.name));
+  const order=site.brands||[],brands=[...new Set(items.map(i=>i.brand))].sort((a,b)=>{const x=order.indexOf(a),y=order.indexOf(b);return (x<0?1e9:x)-(y<0?1e9:y)||a.localeCompare(b)});
+  const it=(attrs,label,cnt,on)=>`<button class="mi${on?" on":""}" ${attrs}><span>${label}</span>${cnt!=null?`<small>${cnt}</small>`:""}</button>`;
+  $("mTitle").textContent=site.title||"HYPE";
+  $("mBody").innerHTML=it('data-m="all"',t("mAll"),items.length,brand==="全部"&&!grp&&!onlyFav)
+   +(gl.length?`<div class="msec">${t("mCats")}</div>`+gl.map(g=>{const subs=g.subs.filter(c=>n(i=>i.category===c&&groupOf(i)===g.name));
+      return subs.length?`<details${grp===g.name?" open":""}><summary class="mi${grp===g.name&&!cat?" on":""}"><span>${esc(tr(g.name))}</span><small>${n(i=>groupOf(i)===g.name)}</small></summary>
+        ${it(`data-mg="${esc(g.name)}" data-mc=""`,t("all")+" "+esc(tr(g.name)),null,grp===g.name&&!cat)}${subs.map(c=>it(`data-mg="${esc(g.name)}" data-mc="${esc(c)}"`,esc(tr(c)),n(i=>i.category===c&&groupOf(i)===g.name),grp===g.name&&cat===c)).join("")}</details>`
+        :it(`data-mg="${esc(g.name)}" data-mc=""`,esc(tr(g.name)),n(i=>groupOf(i)===g.name),grp===g.name)}).join(""):"")
+   +(brands.length?`<details open><summary class="msec">${t("mBrands")}</summary>${brands.map(b=>it(`data-mb="${esc(b)}"`,`${site.logos?.[b]?`<img src="${esc(site.logos[b])}" alt="">`:""}${esc(b)}`,n(i=>i.brand===b),brand===b)).join("")}</details>`:"")
+   +`<div class="msec">${t("mMore")}</div>`+it('data-m="fav"',"♥ "+t("favs").replace(/^♥\s*/,""),favs.size,onlyFav)
+   +(site.info?it('data-m="info"',t("info")):"")
+   +(site.ig?`<a class="mi" href="https://instagram.com/${encodeURIComponent(site.ig)}" target="_blank" rel="noopener"><span>Instagram</span><small>@${esc(site.ig)}</small></a>`:"")
+   +(site.line?`<a class="mi" href="${esc(lineUrl(site.line))}" target="_blank" rel="noopener"><span>LINE</span></a>`:"");
+  $("menu").showModal();
+}
+function pick(f){f();render();$("menu").close();scrollTo({top:0})}
+$("menuBtn").onclick=openMenu;$("mClose").onclick=()=>$("menu").close();
+$("menu").onclick=e=>{if(e.target===$("menu"))return $("menu").close();
+  const b=e.target.closest("button.mi");if(!b)return;const d=b.dataset;
+  if(d.m==="all")pick(()=>{brand="全部";grp=cat=cond="";onlyFav=onlyAvail=false;$("q").value="";$("fPrice").value="0";$("fSize").value=""});
+  else if(d.m==="fav")pick(()=>{onlyFav=true});
+  else if(d.m==="info"){$("menu").close();openInfo()}
+  else if(d.mg!=null)pick(()=>{grp=d.mg;cat=d.mc;brand="全部";onlyFav=false});
+  else if(d.mb!=null)pick(()=>{brand=d.mb;grp=cat="";onlyFav=false});
+};
 function seo(){
   const base=location.href.split("#")[0],s=document.createElement("script");s.type="application/ld+json";
   s.textContent=JSON.stringify({"@context":"https://schema.org","@type":"ItemList",itemListElement:items.filter(i=>status(i)!=="sold").map((i,k)=>({"@type":"ListItem",position:k+1,url:new URL("p/"+i.id+".html",base).href,name:i.brand+" "+i.name}))});

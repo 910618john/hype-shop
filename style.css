@@ -180,3 +180,27 @@ table.size td,table.size th{text-align:center;white-space:nowrap}
 .lg i.s1{background:var(--s1)}.lg i.s2{background:var(--s2)}
 .tip{position:absolute;background:var(--acc);color:var(--accfg);font-size:12px;line-height:1.5;padding:6px 10px;border-radius:8px;pointer-events:none;white-space:nowrap;z-index:5}
 .themeBtn{padding:7px 12px;min-width:38px;justify-content:center}
+.menuBtn{width:38px;height:38px;padding:0;border:none;background:transparent;display:inline-flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;flex:none;margin-left:-8px}
+.menuBtn span{display:block;width:20px;height:2px;background:var(--fg);border-radius:2px}
+.top h1{margin-right:auto}
+dialog.drawer{margin:0;width:min(320px,85vw);max-width:none;height:100%;max-height:none;border-radius:0 16px 16px 0;padding:0;animation:dIn .2s ease-out}
+@keyframes dIn{from{transform:translateX(-100%)}to{transform:none}}
+.dhead{display:flex;justify-content:space-between;align-items:center;padding:16px 16px 8px;position:sticky;top:0;background:var(--card);z-index:1}
+.dhead b{letter-spacing:.2em;font-size:18px}
+.dhead button{border:none;width:36px;height:36px;padding:0;justify-content:center}
+#mBody{padding:0 8px 24px}
+.msec{font-size:12px;font-weight:700;color:var(--mute);letter-spacing:.1em;padding:16px 12px 6px;list-style:none;cursor:pointer}
+.mi{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;border:none;border-radius:10px;background:transparent;padding:10px 12px;font-size:15px;color:var(--fg);text-decoration:none;cursor:pointer;list-style:none}
+.mi span{display:flex;align-items:center;gap:8px;min-width:0}
+.mi img{width:22px;height:22px;object-fit:contain}
+.mi small{color:var(--mute);font-size:12px}
+.mi:hover{background:var(--bg)}
+.mi.on{background:var(--acc);color:var(--accfg)}.mi.on small{color:inherit;opacity:.7}
+details>summary::-webkit-details-marker{display:none}
+details>summary.mi::after,details>summary.msec::after{content:"›";margin-left:6px;transition:transform .15s;color:var(--mute)}
+details[open]>summary.mi::after,details[open]>summary.msec::after{transform:rotate(90deg)}
+details>summary.mi small{margin-left:auto}
+details .mi:not(summary){padding-left:28px;font-size:14px}
+details>summary.msec{display:flex;justify-content:space-between}
+@media(max-width:600px){dialog.drawer{height:100%;margin:0;border-radius:0 16px 16px 0}}
+.top .search{margin-left:0}

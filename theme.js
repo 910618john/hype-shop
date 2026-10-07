@@ -6,7 +6,7 @@
   function apply(t){d.setAttribute("data-theme",t);paint()}
   function paint(){
     var dark=d.getAttribute("data-theme")==="dark";
-    document.querySelectorAll(".themeBtn").forEach(function(b){b.textContent=dark?"☀":"☾";b.title=b.ariaLabel=dark?"切換淺色":"切換深色"});
+    document.querySelectorAll(".themeBtn").forEach(function(b){b.textContent=dark?"☀️":"🌙";b.title=b.ariaLabel=dark?"切換淺色":"切換深色"});
     var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=dark?"#0e0e0e":"#141414";
   }
   apply(saved||(mq.matches?"dark":"light"));
