@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.goatcounter.com; connect-src 'self' https://formspree.io https://*.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'; worker-src 'self'"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HYPE 潮流精品</title>
 <meta name="description" content="潮流精品 · 正品現貨，IG / LINE 詢問">
 <meta property="og:title" content="HYPE 潮流精品"><meta property="og:description" content="潮流精品 · 正品現貨，IG / LINE 詢問"><meta property="og:type" content="website">
@@ -62,6 +62,7 @@ const status=i=>i.status||(i.sold?"sold":"available");
 const isNewC=i=>NEWC.includes(i.condition);
 const isNew=i=>status(i)==="available"&&Date.now()-(i.createdAt||0)<7*864e5;
 let hotSet=new Set();
+const th=p=>/^img\/\d+-[a-z0-9]+\.jpg$/.test(p)?p.replace(/\.jpg$/,"_t.jpg"):p;
 const sale=i=>i.saleEnd&&off(i)&&i.saleEnd>Date.now();
 const left=ms=>{const s=Math.max(0,Math.floor(ms/1e3)),d=Math.floor(s/86400),h=String(Math.floor(s%86400/3600)).padStart(2,"0"),m=String(Math.floor(s%3600/60)).padStart(2,"0"),x=String(s%60).padStart(2,"0");return (d?d+(lang==="en"?"d ":"天 "):"")+h+":"+m+":"+x};
 function applySale(i){return i.saleEnd&&Date.now()>=i.saleEnd?{...i,price:i.origPrice??i.price,origPrice:null,saleEnd:null}:i}
@@ -78,7 +79,7 @@ function badges(i){const s=status(i),b=[];
   if(hotSet.has(i.id))b.push(`<span class="badge hot">🔥 ${t("hot")}</span>`);if(isNew(i))b.push(`<span class="badge new">NEW</span>`);if(off(i)&&s!=="sold")b.push(`<span class="badge off">${sale(i)?"⏰ ":""}-${off(i)}%</span>`);
   return b.length?`<div class="badges">${b.join("")}</div>`:""}
 function card(i,fav=true){const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
-  ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="${esc(i.brand+" "+i.name)}">`:`<div class="ph"></div>`}${badges(i)}
+  ${i.photos?.[0]?`<img class="ph" loading="lazy" decoding="async" src="${esc(th(i.photos[0]))}" data-full="${esc(i.photos[0])}" alt="${esc(i.brand+" "+i.name)}">`:`<div class="ph"></div>`}${badges(i)}
   ${fav?`<button class="fav${favs.has(i.id)?" on":""}" data-fav="${esc(i.id)}" aria-label="收藏">${favs.has(i.id)?"♥":"♡"}</button>`:""}
   <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${off(i)?`<span class="orig">${fmt(i.origPrice)}</span>`:""}</div>${sale(i)&&s!=="sold"?`<div class="cd" data-end="${i.saleEnd}">⏰ ${left(i.saleEnd-Date.now())}</div>`:""}
   ${fav?`<div class="tags">${[i.condition,i.size,i.category||i.group].filter(Boolean).map(x=>`<span class="tag">${esc(tr(x))}</span>`).join("")}${i.qty>1&&s!=="sold"?`<span class="stock">${t("left")(i.qty)}</span>`:""}</div>`:""}</div></div>`}
@@ -125,7 +126,8 @@ $("grpChips").onclick=e=>{const b=e.target.closest("[data-g]");if(b){grp=b.datas
 $("catChips").onclick=e=>{const b=e.target.closest("[data-c]");if(b){cat=b.dataset.c;render()}};
 $("fNew").onclick=e=>{const b=e.target.closest("[data-n]");if(b){cond=b.dataset.n;render()}};
 $("recent").onclick=e=>{const c=e.target.closest(".card");if(c)openView(items.find(i=>i.id===c.dataset.id))};
-$("q").oninput=$("fPrice").onchange=$("fSize").onchange=$("fSort").onchange=render;
+let qT;$("q").oninput=()=>{clearTimeout(qT);qT=setTimeout(render,150)};
+$("fPrice").onchange=$("fSize").onchange=$("fSort").onchange=render;
 $("fAvail").onclick=()=>{onlyAvail=!onlyAvail;render()};
 $("fFav").onclick=()=>{onlyFav=!onlyFav;render()};
 $("lang").onclick=()=>{lang=lang==="en"?"zh":"en";store.set("lang",lang);applyLang()};
@@ -133,7 +135,7 @@ $("grid").onclick=e=>{const f=e.target.closest("[data-fav]");if(f)return toggleF
 
 function toast(m){const d=document.createElement("div");d.className="toast";d.textContent=m;document.body.append(d);setTimeout(()=>d.remove(),2200)}
 async function copy(m){try{await navigator.clipboard.writeText(m);return true}catch{return false}}
-const count=(path,title)=>{try{window.goatcounter?.count?.({path,title})}catch{}};
+const count=(path,title)=>{const gc=site.goatcounter;if(!gc||!/^[a-z0-9-]+$/.test(gc))return;try{const u=new URL(`https://${gc}.goatcounter.com/count`),q=u.searchParams;q.set("p",path);if(title)q.set("t",title);if(document.referrer)q.set("r",document.referrer);q.set("s",[screen.width,screen.height,devicePixelRatio||1].join(","));q.set("rnd",Math.random().toString(36).slice(2));new Image().src=u.href}catch{}};
 
 function similar(it){
   const score=i=>(i.brand===it.brand?2:0)+(i.category&&i.category===it.category?1:0);
@@ -229,6 +231,7 @@ $("menu").onclick=e=>{if(e.target===$("menu"))return $("menu").close();
   else if(d.mg!=null)pick(()=>{grp=d.mg;cat=d.mc;brand="全部";onlyFav=false});
   else if(d.mb!=null)pick(()=>{brand=d.mb;grp=cat="";onlyFav=false});
 };
+document.addEventListener("error",e=>{const im=e.target;if(im.tagName==="IMG"&&im.dataset.full&&im.src.indexOf(im.dataset.full)<0)im.src=im.dataset.full},true);
 // 倒數計時：每秒更新，時間到自動恢復原價
 setInterval(()=>{let exp=false;document.querySelectorAll("[data-end]").forEach(e=>{const ms=+e.dataset.end-Date.now();if(ms<=0)exp=true;else e.textContent=(e.dataset.pre||"⏰ ")+left(ms)});
   if(exp){items=items.map(applySale);render();const id=$("viewDlg").open&&$("viewDlg").dataset.id;if(id)openView(items.find(i=>i.id===id))}},1000);
@@ -245,7 +248,7 @@ fetch("data.json?t="+Date.now()).then(r=>r.json()).then(d=>{
   if(site.notice){$("notice").hidden=false;$("notice").textContent=site.notice}
   if(site.ig){$("igTop").hidden=false;$("igTop").href="https://instagram.com/"+encodeURIComponent(site.ig)}
   if(site.line){$("lineTop").hidden=false;$("lineTop").href=lineUrl(site.line)}
-  if(site.goatcounter&&/^[a-z0-9-]+$/.test(site.goatcounter)){const g=document.createElement("script");g.async=true;g.src="https://gc.zgo.at/count.js";g.dataset.goatcounter=`https://${site.goatcounter}.goatcounter.com/count`;document.head.append(g)}
+  count(location.pathname,document.title);
   fillFilters();render();seo();
   const h=decodeURIComponent(location.hash.slice(1));if(h)openView(items.find(i=>i.id===h));
 }).catch(()=>{$("empty").textContent=t("fail")});

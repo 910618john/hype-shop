@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://*.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'; worker-src 'self'"><meta name="referrer" content="no-referrer"><script>if(window.top!==window.self)document.documentElement.style.display="none"</script><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>HYPE 後台</title>
 <meta name="theme-color" content="#141414"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="HYPE後台"><link rel="manifest" href="admin.webmanifest"><link rel="apple-touch-icon" href="admin-180.png"><link rel="icon" href="admin-192.png">
@@ -128,34 +128,41 @@ async function shaOf(path){try{return (await gh(path)).sha}catch{return null}}
 async function putFile(path,content,msg){const s=await shaOf(path);return gh(path,{method:"PUT",body:JSON.stringify({message:msg,content,branch:BRANCH,...(s?{sha:s}:{})})})}
 async function delFile(path){const s=await shaOf(path);if(s)await gh(path,{method:"DELETE",body:JSON.stringify({message:"刪除 "+path,sha:s,branch:BRANCH})}).catch(()=>{})}
 const inUse=p=>data.items.some(i=>(i.photos||[]).includes(p))||Object.values(data.site.logos||{}).includes(p);
-async function cleanup(paths){for(const p of paths)if(!inUse(p))await delFile(p)}
+const th=p=>/^img\/\d+-[a-z0-9]+\.jpg$/.test(p)?p.replace(/\.jpg$/,"_t.jpg"):null;
+async function cleanup(paths){for(const p of paths)if(!inUse(p)){await delFile(p);if(th(p))await delFile(th(p))}}
 
+let saveQ=Promise.resolve();const serial=f=>{const p=saveQ.then(f,f);saveQ=p.catch(()=>{});return p};
 async function load(){const f=await gh("data.json");sha=f.sha;data=JSON.parse(utf8b64(f.content));data.site??={};data.items??=[];render()}
-async function save(msg){
+function save(msg){return serial(async()=>{
   try{const r=await gh("data.json",{method:"PUT",body:JSON.stringify({message:msg,content:b64utf8(JSON.stringify(data,null,2)),sha,branch:BRANCH})});sha=r.content.sha;render()}
   catch(e){if(e.status===409){await load();throw new Error("資料已被其他裝置更新，已重新載入，請再操作一次")}throw e}
-}
+})}
 
 // ---------- 加密的銷售資料 (private.json) ----------
 async function deriveKey(pass,salt){const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
   return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:200000,hash:"SHA-256"},k,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+const kv={db:null,open(){return this.db??=new Promise((res,rej)=>{const r=indexedDB.open("hype",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+  async get(k){try{const d=await this.open();return await new Promise(res=>{const q=d.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(undefined)})}catch{return undefined}},
+  async set(k,v){try{const d=await this.open();await new Promise(res=>{const t=d.transaction("kv","readwrite"),o=t.objectStore("kv");v===undefined?o.delete(k):o.put(v,k);t.oncomplete=t.onerror=()=>res()})}catch{}}};
+let privEnv=null;
 async function loadPriv(){
-  try{const f=await gh("private.json");privSha=f.sha;const env=JSON.parse(utf8b64(f.content));privSalt=b64bytes(env.salt);privState="locked";window._env=env;
-    const p=ls.get("hs_pass");if(p)await unlock(p,env).catch(()=>ls.set("hs_pass",""))}
+  try{const f=await gh("private.json");privSha=f.sha;privEnv=JSON.parse(utf8b64(f.content));privSalt=b64bytes(privEnv.salt);privState="locked";
+    let key=await kv.get("privKey");const old=ls.get("hs_pass");if(!key&&old)key=await deriveKey(old,privSalt);ls.set("hs_pass","");
+    if(key)await openWith(key).then(()=>kv.set("privKey",key)).catch(()=>kv.set("privKey"))}
   catch(e){if(e.status===404)privState="none";else throw e}
 }
-async function unlock(pass,env=window._env){
-  const key=await deriveKey(pass,b64bytes(env.salt));
-  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64bytes(env.iv)},key,b64bytes(env.ct)).catch(()=>{throw new Error("密碼錯誤")});
-  priv=JSON.parse(new TextDecoder().decode(pt));priv.costs??={};priv.sales??=[];privKey=key;privState="open";ls.set("hs_pass",pass);
+async function openWith(key){
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64bytes(privEnv.iv)},key,b64bytes(privEnv.ct)).catch(()=>{throw new Error("密碼錯誤")});
+  priv=JSON.parse(new TextDecoder().decode(pt));priv.costs??={};priv.sales??=[];privKey=key;privState="open";
 }
-async function savePriv(msg){
+async function unlock(pass){const key=await deriveKey(pass,b64bytes(privEnv.salt));await openWith(key);await kv.set("privKey",key)}
+function savePriv(msg){return serial(async()=>{
   const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},privKey,new TextEncoder().encode(JSON.stringify(priv))));
-  const env={v:1,salt:bytesB64(privSalt),iv:bytesB64(iv),ct:bytesB64(ct)};window._env=env;
+  const env={v:1,salt:bytesB64(privSalt),iv:bytesB64(iv),ct:bytesB64(ct)};privEnv=env;
   try{const r=await gh("private.json",{method:"PUT",body:JSON.stringify({message:msg,content:b64utf8(JSON.stringify(env)),branch:BRANCH,...(privSha?{sha:privSha}:{})})});privSha=r.content.sha}
   catch(e){if(e.status===409){await loadPriv();throw new Error("銷售資料已被其他裝置更新，已重新載入，請再操作一次")}throw e}
-}
-async function createPriv(pass){privSalt=crypto.getRandomValues(new Uint8Array(16));privKey=await deriveKey(pass,privSalt);priv={costs:{},sales:[]};privState="open";ls.set("hs_pass",pass);await savePriv("建立加密銷售資料")}
+})}
+async function createPriv(pass){privSalt=crypto.getRandomValues(new Uint8Array(16));privKey=await deriveKey(pass,privSalt);priv={costs:{},sales:[]};privState="open";await kv.set("privKey",privKey);await savePriv("建立加密銷售資料")}
 
 // ---------- 商品頁 (SEO + 分享預覽) / sitemap ----------
 function productPage(i){
@@ -164,7 +171,7 @@ function productPage(i){
   const ld={"@context":"https://schema.org","@type":"Product",name:title,brand:{"@type":"Brand",name:i.brand},image:(i.photos||[]).map(p=>BASE+p),description:i.desc||title,url,
     ...(i.price!=null?{offers:{"@type":"Offer",price:i.price,priceCurrency:"TWD",availability:"https://schema.org/"+(s==="sold"?"SoldOut":"InStock"),itemCondition:"https://schema.org/"+(NEWC.includes(i.condition)?"NewCondition":"UsedCondition"),url}}:{})};
   const go=`../#${i.id}`;
-  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} | ${esc(siteT)}</title><meta name="description" content="${esc(d)}"><link rel="canonical" href="${esc(url)}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(d)}"><meta property="og:type" content="product"><meta property="og:url" content="${esc(url)}">
 ${img?`<meta property="og:image" content="${esc(img)}"><meta name="twitter:card" content="summary_large_image">`:""}
@@ -185,7 +192,7 @@ function render(){
   $("brandList").innerHTML=allBrands().map(b=>`<option value="${esc(b)}">`).join("");
   $("sizeList").innerHTML=[...new Set([...SIZES,...items.map(i=>i.size).filter(Boolean)])].map(s=>`<option value="${esc(s)}">`).join("");
   $("grid").innerHTML=items.map(i=>{const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
-    ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
+    ${i.photos?.[0]?`<img class="ph" loading="lazy" decoding="async" src="${esc(th(i.photos[0])||i.photos[0])}" data-full="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
     <input type="checkbox" class="chk" data-chk="${esc(i.id)}"${sel.has(i.id)?" checked":""}>
     <div class="badges">${i.hidden?`<span class="badge" style="background:#6b6b6b">草稿</span>`:""}${s==="sold"?`<span class="badge">SOLD</span>`:s==="reserved"?`<span class="badge reserved">保留中</span>`:""}</div>
     <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${i.qty>1?` <span class="stock">×${i.qty}</span>`:""}</div><div style="font-size:12px;color:var(--mute)">${i.hot?"🔥 ":""}${(data.site.views||{})[i.id]!=null?"👁 "+data.site.views[i.id]:""}${i.saleEnd?` ⏰ 到 ${new Date(i.saleEnd).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`:""}</div>
@@ -198,7 +205,7 @@ function render(){
 $("grid").onclick=e=>{if(e.target.closest("select,.chk"))return;const c=e.target.closest(".card");if(c)openForm(data.items.find(i=>i.id===c.dataset.id))};
 $("grid").onchange=async e=>{
   const c=e.target.closest("[data-chk]");if(c){c.checked?sel.add(c.dataset.chk):sel.delete(c.dataset.chk);render();return}
-  const sl=e.target.closest("[data-st]");if(!sl)return;const it=data.items.find(i=>i.id===sl.dataset.st),old=status(it);
+  const sl=e.target.closest("[data-st]");if(!sl)return;const it=data.items.find(i=>i.id===sl.dataset.st);if(!it)return render();const old=status(it);
   sl.disabled=true;it.status=sl.value;delete it.sold;
   try{await save(ST[it.status]+"："+it.name);writePage(it)}catch(err){it.status=old;alert(err.message);render()}
 };
@@ -236,6 +243,7 @@ $("thumbs").ondrop=e=>{e.preventDefault();const d=e.target.closest("[data-k]");i
 $("thumbs").ondragend=()=>{dragK=null;drawThumbs()};
 $("addBtn").onclick=()=>openForm();
 $("cancel").onclick=()=>$("formDlg").close();
+$("formDlg").addEventListener("close",()=>{const f=[...fresh];fresh=new Set();if(f.length)cleanup(f)});
 $("dup").onclick=()=>openForm(editing,true);
 
 function shrink(file,{max=1600,type="image/jpeg",wm=""}={}){return new Promise(res=>{
@@ -247,15 +255,16 @@ function shrink(file,{max=1600,type="image/jpeg",wm=""}={}){return new Promise(r
     URL.revokeObjectURL(u);c.toBlob(b=>res(b),type,.85)};
   img.onerror=()=>{URL.revokeObjectURL(u);res(null)};img.src=u;})}
 const wmText=()=>data.site.watermark===false?"":(data.site.wmText||(data.site.ig?"@"+data.site.ig:""));
-async function uploadImg(blob,prefix,ext){const path=`img/${prefix}${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+async function uploadImg(blob,prefix,ext,path){path??=`img/${prefix}${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
   await gh(path,{method:"PUT",body:JSON.stringify({message:"上傳圖片",content:await blobB64(blob),branch:BRANCH})});return path}
+let fresh=new Set();
 
 $("fPhotos").onchange=async e=>{
   const files=[...e.target.files];if(!files.length)return;$("save").disabled=true;let n=0;
   for(const f of files){
     $("fMsg").textContent=`上傳中 ${++n}/${files.length}…`;
-    const b=await shrink(f,{wm:wmText()});if(!b){$("fMsg").textContent="無法讀取：「"+f.name+"」";continue}
-    try{const path=await uploadImg(b,"","jpg");pending.push({path,url:URL.createObjectURL(b)});drawThumbs()}
+    const b=await shrink(f,{wm:wmText()}),t=await shrink(f,{max:600,wm:wmText()});if(!b){$("fMsg").textContent="無法讀取：「"+f.name+"」";continue}
+    try{const path=await uploadImg(b,"","jpg");fresh.add(path);if(t)await uploadImg(t,"","jpg",th(path)).catch(()=>{});pending.push({path,url:URL.createObjectURL(b)});drawThumbs()}
     catch(err){$("fMsg").textContent="上傳失敗："+err.message}
   }
   if($("fMsg").textContent.startsWith("上傳中"))$("fMsg").textContent="";$("save").disabled=false;e.target.value="";
@@ -269,19 +278,21 @@ $("form").onsubmit=async e=>{
   if(v.saleEnd&&!(v.origPrice>v.price))return $("fMsg").textContent="限時特價要填「原價」，而且原價要高於售價";
   if(v.saleEnd&&v.saleEnd<=Date.now())return $("fMsg").textContent="特價結束時間要在未來";
   $("save").disabled=true;$("fMsg").textContent="儲存中…";
-  const removed=(editing?.photos||[]).filter(p=>!v.photos.includes(p)),isNewItem=!editing,wasHidden=!!editing?.hidden;let it=editing;
+  let it=editing&&data.items.find(i=>i.id===editing.id);
+  if(editing&&!it){$("save").disabled=false;return $("fMsg").textContent="這件商品已被刪除，請關閉視窗"}
+  const removed=(it?.photos||[]).filter(p=>!v.photos.includes(p)),isNewItem=!it,wasHidden=!!it?.hidden;
   try{
     if(it){Object.assign(it,v);delete it.sold}else{it={id:Date.now().toString(36),createdAt:Date.now(),...v};data.items.push(it)}
     data.site.brands=allBrands();
     await save((editing?"編輯：":"發布：")+v.name);
     if(privState==="open"){const c=num($("fCost").value);if((priv.costs[it.id]??null)!==c){c==null?delete priv.costs[it.id]:priv.costs[it.id]=c;await savePriv("更新成本")}}
-    $("formDlg").close();await writePage(it);if(isNewItem||wasHidden!==!!it.hidden)await writeSitemap();await cleanup(removed);
-  }catch(err){$("fMsg").textContent="儲存失敗："+err.message}
+    editing=it;$("formDlg").close();await writePage(it);if(isNewItem||wasHidden!==!!it.hidden)await writeSitemap();await cleanup(removed);
+  }catch(err){if(isNewItem)data.items=data.items.filter(x=>x!==it);$("fMsg").textContent="儲存失敗："+err.message}
   $("save").disabled=false;
 };
 $("del").onclick=async()=>{
   if(!editing||!confirm("確定刪除「"+editing.name+"」？"))return;
-  const it=editing;data.items=data.items.filter(i=>i!==it);
+  const it=data.items.find(i=>i.id===editing.id);if(!it)return $("formDlg").close();data.items=data.items.filter(i=>i!==it);
   try{await save("刪除："+it.name);$("formDlg").close();await delFile("p/"+it.id+".html");await cleanup(it.photos||[]);await writeSitemap()}
   catch(err){data.items.push(it);$("fMsg").textContent="刪除失敗："+err.message}
 };
@@ -296,7 +307,7 @@ $("sellBtn").onclick=()=>{
 };
 $("saleCancel").onclick=()=>$("saleDlg").close();
 $("saleForm").onsubmit=async e=>{
-  e.preventDefault();const it=saleFor,q=Math.max(1,num($("sQty").value)||1);
+  e.preventDefault();const it=data.items.find(i=>i.id===saleFor.id);if(!it){$("saleMsg").textContent="這件商品已被刪除";return}const q=Math.max(1,num($("sQty").value)||1);
   const rec={id:Date.now().toString(36),itemId:it.id,brand:it.brand,name:it.name,size:it.size||"",qty:q,price:num($("sPrice").value)||0,cost:num($("sCost").value),date:$("sDate").value,buyer:$("sBuyer").value.trim(),note:$("sNote").value.trim()};
   try{priv.sales.push(rec);if(rec.cost!=null&&priv.costs[it.id]==null)priv.costs[it.id]=rec.cost;await savePriv("成交："+it.name)}
   catch(err){priv.sales.pop();$("saleMsg").textContent=err.message;return}
@@ -332,7 +343,7 @@ function renderSales(){
     ${S.map(s=>`<tr><td>${esc(s.date)}</td><td>${esc(s.brand+" "+s.name)}${s.size?" / "+esc(s.size):""}${s.note?`<div style="font-size:12px;color:var(--mute)">${esc(s.note)}</div>`:""}</td><td class="n">${s.qty}</td><td class="n">${fmt(rev(s))}</td><td class="n">${s.cost!=null?fmt(cost(s)):"—"}</td><td class="n">${s.cost!=null?fmt(rev(s)-cost(s)):"—"}</td><td>${esc(s.buyer)}</td><td><button class="danger" data-rmsale="${esc(s.id)}" style="padding:3px 10px">刪</button></td></tr>`).join("")}</table></div>`;
   drawCharts(S,rev,cost);
   $("csvSales").onclick=()=>csv("sales",[["日期","品牌","商品","尺寸","數量","成交單價","單件成本","營收","利潤","買家","備註"],...S.map(s=>[s.date,s.brand,s.name,s.size,s.qty,s.price,s.cost??"",rev(s),s.cost!=null?rev(s)-cost(s):"",s.buyer,s.note])]);
-  $("lock").onclick=()=>{ls.set("hs_pass","");priv=null;privKey=null;privState="locked";render()};
+  $("lock").onclick=()=>{kv.set("privKey");priv=null;privKey=null;privState="locked";render()};
   P.querySelectorAll("[data-rmsale]").forEach(b=>b.onclick=async()=>{if(!confirm("刪除這筆成交紀錄？（不會改回庫存）"))return;const old=priv.sales;priv.sales=priv.sales.filter(s=>s.id!==b.dataset.rmsale);
     try{await savePriv("刪除成交紀錄");render()}catch(err){priv.sales=old;alert(err.message)}});
 }
@@ -369,7 +380,7 @@ function drawCharts(S,rev,cost){
 
 // ---------- CSV ----------
 function csv(name,rows){
-  const t="\ufeff"+rows.map(r=>r.map(v=>{v=String(v??"");return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}).join(",")).join("\r\n");
+  const t="\ufeff"+rows.map(r=>r.map(v=>{if(typeof v!=="number"&&/^[=+\-@\t\r]/.test(String(v??"")))v="'"+v;v=String(v??"");return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}).join(",")).join("\r\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download=`${name}-${new Date().toISOString().slice(0,10)}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 $("csvItems").onclick=()=>{const o=privState==="open";csv("items",[["ID","品牌","商品","大分類","小分類","尺寸","狀況","狀態","售價","原價","庫存",...(o?["成本"]:[]),"上架日期","照片數","連結"],
@@ -549,7 +560,7 @@ $("setForm").onsubmit=async e=>{e.preventDefault();const s=data.site;
 $("copyTok").onclick=async()=>{try{await navigator.clipboard.writeText(token);$("copyTok").textContent="已複製 ✓"}catch{prompt("長按複製這段 Token",token)}setTimeout(()=>$("copyTok").textContent="📋 複製 Token",2000)};
 $("viewsBtn").onclick=async()=>{$("viewsMsg").textContent="更新中…";const r=await refreshViews(true);
   $("viewsMsg").textContent={ok:"已更新 ✓",noGc:"先填 GoatCounter 代碼並儲存",fail:"讀不到瀏覽數：請到 GoatCounter → Settings 勾選「Allow adding visitor counts on your website」"}[r]||""};
-$("logout").onclick=()=>{ls.set("gh_token","");ls.set("hs_pass","");location.reload()};
+$("logout").onclick=async()=>{ls.set("gh_token","");ls.set("hs_pass","");await kv.set("privKey");location.reload()};
 
 async function start(){
   if(!token){$("login").hidden=false;return}
@@ -558,6 +569,7 @@ async function start(){
 }
 $("pasteBtn").onclick=async()=>{try{const v=(await navigator.clipboard.readText()).trim();if(v){$("tok").value=v;token=v;start()}}catch{$("tok").focus();$("lMsg").textContent="無法讀取剪貼簿，請長按輸入框貼上"}};
 $("loginBtn").onclick=()=>{token=$("tok").value.trim();if(token)start()};
+document.addEventListener("error",e=>{const im=e.target;if(im.tagName==="IMG"&&im.dataset.full&&im.src.indexOf(im.dataset.full)<0)im.src=im.dataset.full},true);
 start();
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
