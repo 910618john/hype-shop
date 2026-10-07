@@ -525,7 +525,7 @@ $("logout").onclick=()=>{ls.set("gh_token","");ls.set("hs_pass","");location.rel
 
 async function start(){
   if(!token){$("login").hidden=false;return}
-  try{await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);render()}
+  try{await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render()}
   catch(err){$("login").hidden=false;$("lMsg").textContent="登入失敗："+err.message}
 }
 $("loginBtn").onclick=()=>{token=$("tok").value.trim();if(token)start()};
