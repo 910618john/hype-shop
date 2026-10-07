@@ -3,11 +3,11 @@
 <meta name="robots" content="noindex"><title>HYPE 後台</title>
 <meta name="theme-color" content="#141414"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="HYPE後台"><link rel="manifest" href="admin.webmanifest"><link rel="apple-touch-icon" href="admin-180.png"><link rel="icon" href="admin-192.png">
-<link rel="stylesheet" href="style.css"></head>
+<script src="theme.js"></script><link rel="stylesheet" href="style.css"></head>
 <body>
 <header><div class="wrap">
   <div class="top"><h1>後台</h1>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><a class="btn" href="./" target="_blank">看前台</a><button id="setBtn" hidden>設定</button><button class="pri" id="addBtn" hidden>＋ 發布</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="themeBtn" type="button">☾</button><a class="btn" href="./" target="_blank">看前台</a><button id="setBtn" hidden>設定</button><button class="pri" id="addBtn" hidden>＋ 發布</button></div>
   </div>
   <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="brands">品牌</button><button data-tab="cats">分類</button><button data-tab="sales">銷售紀錄</button><span style="flex:1"></span><button id="csvItems">匯出商品 CSV</button></div>
 </div></header>
@@ -164,8 +164,8 @@ function productPage(i){
 <title>${esc(title)} | ${esc(siteT)}</title><meta name="description" content="${esc(d)}"><link rel="canonical" href="${esc(url)}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(d)}"><meta property="og:type" content="product"><meta property="og:url" content="${esc(url)}">
 ${img?`<meta property="og:image" content="${esc(img)}"><meta name="twitter:card" content="summary_large_image">`:""}
-<script type="application/ld+json">${JSON.stringify(ld).replace(/</g,"\\u003c")}<\/script><link rel="stylesheet" href="../style.css"></head>
-<body><header><div class="wrap"><div class="top"><h1><a href="../" style="text-decoration:none">${esc(siteT)}</a></h1><a class="btn pri" href="${go}">查看 / 詢問</a></div></div></header>
+<script type="application/ld+json">${JSON.stringify(ld).replace(/</g,"\\u003c")}<\/script><script src="../theme.js"><\/script><link rel="stylesheet" href="../style.css"></head>
+<body><header><div class="wrap"><div class="top"><h1><a href="../" style="text-decoration:none">${esc(siteT)}</a></h1><span style="display:flex;gap:8px"><button class="themeBtn" type="button">☾</button><a class="btn pri" href="${go}">查看 / 詢問</a></span></div></div></header>
 <main class="wrap" style="max-width:640px;padding:20px 16px 60px"><div class="brand">${esc(i.brand)}${s!=="available"?` · <span style="color:var(--danger)">${ST[s]}</span>`:""}</div>
 <h2 style="margin:4px 0">${esc(i.name)}</h2><div class="price">${fmt(i.price)}${i.origPrice>i.price?`<span class="orig">${fmt(i.origPrice)}</span>`:""}</div>
 <div class="tags">${[i.condition,i.size,i.group,i.category].filter(Boolean).map(x=>`<span class="tag">${esc(x)}</span>`).join("")}</div>
