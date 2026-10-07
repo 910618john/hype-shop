@@ -125,7 +125,7 @@ async function api(url,opt={}){const r=await fetch(`https://api.github.com/repos
   if(r.status===204)return null;const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.message||r.status);e.status=r.status;throw e}return j}
 async function gh(path,opt={},br=WB){
   const r=await fetch(API+path+(opt.method?"":"?ref="+encodeURIComponent(br)),{...opt,headers:{Authorization:"Bearer "+token,Accept:"application/vnd.github+json","Content-Type":"application/json"},cache:"no-store"});
-  if(!r.ok){const e=new Error((await r.json().catch(()=>({}))).message||r.status);e.status=r.status;throw e}
+  if(!r.ok){let m=(await r.json().catch(()=>({}))).message||r.status;if(/rule|protected branch/i.test(m))m="main 分支受保護，你的帳號不能直接修改，請管理員開啟「審核制」";const e=new Error(m);e.status=r.status;throw e}
   return r.json();
 }
 const bytesB64=b=>{let o="";for(let i=0;i<b.length;i+=8192)o+=String.fromCharCode(...b.subarray(i,i+8192));return btoa(o)};
@@ -568,7 +568,7 @@ const mainPhotos=()=>new Set(data.items.flatMap(i=>i.photos||[]));
 const srcOf=p=>submitter()&&p&&!mainPhotos().has(p)&&!/^(blob|data|https?):/.test(p)&&!Object.values(data.site.logos||{}).includes(p)?raw("refs/heads/"+WB,p):p;
 function viewItems(){const by=new Map(mine.map(m=>[m.id,m])),out=data.items.map(i=>{const m=by.get(i.id);if(!m||i.by!==me)return i;return m.action==="delete"?{...i,_p:"del"}:{...m.item,_p:"upd"}});
   for(const m of mine)if(m.action==="upsert"&&!data.items.some(i=>i.id===m.id))out.push({...m.item,_p:"new"});return out}
-async function ensureBranch(){try{await api(`/git/ref/heads/${WB}`)}catch(e){if(e.status!==404)throw e;const m=await api(`/git/ref/heads/${BRANCH}`);await api("/git/refs",{method:"POST",body:JSON.stringify({ref:`refs/heads/${WB}`,sha:m.object.sha})})}}
+async function ensureBranch(){try{await api(`/git/ref/heads/${WB}`)}catch(e){if(e.status!==404)throw e;mine=[];const m=await api(`/git/ref/heads/${BRANCH}`);await api("/git/refs",{method:"POST",body:JSON.stringify({ref:`refs/heads/${WB}`,sha:m.object.sha})})}}
 async function ensurePR(){const l=await api(`/pulls?state=open&head=${OWNER}:${encodeURIComponent(WB)}`);if(l.length)return l[0];
   return api("/pulls",{method:"POST",body:JSON.stringify({title:`商品投稿：@${me}`,head:WB,base:BRANCH,body:"由 HYPE 後台送出，請到後台「審核」分頁核准或退回。"})})}
 async function loadMine(){mine=[];try{const l=await gh(SUBDIR(),{},WB);for(const f of l.filter(f=>/\.json$/.test(f.name))){try{const j=JSON.parse(utf8b64((await gh(f.path,{},WB)).content));mine.push(j)}catch{}}}catch{}}
@@ -612,19 +612,19 @@ function renderReview(){
   const prot=protOn===false?`<div class="panel" style="border-color:var(--danger)">⚠️ <b>main 分支還沒有保護</b>：成員目前仍可繞過審核直接修改網站。請照「設定」裡的說明開啟。</div>`:protOn?`<div style="font-size:13px;color:var(--ok);padding:12px 0 0">✅ main 分支已保護，成員只能透過投稿修改</div>`:"";
   if(!reviews.length){P.innerHTML=prot+`<div class="empty">沒有待審核的投稿 <button id="revReload" style="margin-left:8px">重新整理</button></div>`;$("revReload").onclick=loadReviews;return}
   P.innerHTML=prot+reviews.map((r,k)=>`<div class="panel"><div class="chhead"><b>@${esc(r.login)} 的投稿（${r.subs.length} 筆）</b><a href="${esc(r.url)}" target="_blank" rel="noopener" style="font-size:13px">GitHub #${r.number}</a></div>
-    ${r.bad.length?`<div class="msg" style="margin:8px 0">⛔ 不能核准：<br>${r.bad.map(esc).join("<br>")}</div>`:""}
+    ${!r.subs.length?`<div style="color:var(--mute);font-size:13px;margin:8px 0">投稿已全部撤回，按「退回」關閉即可</div>`:""}${r.bad.length?`<div class="msg" style="margin:8px 0">⛔ 不能核准：<br>${r.bad.map(esc).join("<br>")}</div>`:""}
     ${r.subs.map(sb=>{const cur=data.items.find(i=>i.id===sb.id),own=!cur||cur.by===r.login;
       if(sb.action==="delete")return `<div class="revrow"><span class="badge" style="background:var(--danger)">刪除</span> ${cur?esc(cur.brand+" "+cur.name):"（已不存在）"}${own?"":` <span class="msg">⚠️ 不是他的商品，會略過</span>`}</div>`;
       const it=sb.item||{},ph=(it.photos||[])[0],src=ph?(data.items.some(i=>(i.photos||[]).includes(ph))?ph:raw(r.sha,th(ph)||ph)):"";
       const diff=cur?Object.keys(FIELDS).filter(f=>JSON.stringify(cur[f]??null)!==JSON.stringify(it[f]??null)).map(f=>`<div>${FIELDS[f]}：<s>${esc(cur[f]??"")}</s> → <b>${esc(it[f]??"")}</b></div>`).join("")+(JSON.stringify(cur.photos)!==JSON.stringify(it.photos)?"<div>照片有變更</div>":""):"";
       return `<div class="revrow">${src?`<img src="${esc(src)}" alt="">`:`<div class="ph0"></div>`}<div><span class="badge" style="background:${cur?"#d98a00":"#1e7a3c"}">${cur?"修改":"新商品"}</span> <b>${esc(it.brand)} ${esc(it.name)}</b> ${fmt(it.price)}
         <div style="font-size:12px;color:var(--mute)">${esc([it.group,it.category,it.size,it.condition,(it.photos||[]).length?(it.photos||[]).length+" 張照片":""].filter(Boolean).join(" · "))}</div>${diff?`<div style="font-size:12px;margin-top:4px">${diff}</div>`:""}${own?"":` <span class="msg">⚠️ 不是他的商品，會略過</span>`}</div></div>`}).join("")}
-    <div class="row"><button class="danger" data-rej="${k}">退回</button><button class="pri" data-ok="${k}"${r.bad.length?" disabled":""}>核准上架</button></div></div>`).join("");
+    <div class="row"><button class="danger" data-rej="${k}">退回</button><button class="pri" data-ok="${k}"${r.bad.length||!r.subs.length?" disabled":""}>核准上架</button></div></div>`).join("");
   P.querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>approve(reviews[+b.dataset.ok],b));
   P.querySelectorAll("[data-rej]").forEach(b=>b.onclick=()=>reject(reviews[+b.dataset.rej],b));
 }
 async function approve(r,btn){
-  if(r.bad.length||!confirm(`核准 @${r.login} 的 ${r.subs.length} 筆投稿並上架？`))return;btn.disabled=true;btn.textContent="處理中…";
+  if(r.bad.length||!r.subs.length||!confirm(`核准 @${r.login} 的 ${r.subs.length} 筆投稿並上架？`))return;btn.disabled=true;btn.textContent="處理中…";
   try{
     await api(`/pulls/${r.number}/reviews`,{method:"POST",body:JSON.stringify({event:"APPROVE",commit_id:r.sha})}).catch(()=>{});
     await api(`/pulls/${r.number}/merge`,{method:"PUT",body:JSON.stringify({merge_method:"squash",sha:r.sha,commit_title:`核准 @${r.login} 的投稿 (#${r.number})`})});

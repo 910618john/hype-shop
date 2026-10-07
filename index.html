@@ -78,8 +78,8 @@ function badges(i){const s=status(i),b=[];
   if(s==="sold")b.push(`<span class="badge">SOLD</span>`);else if(s==="reserved")b.push(`<span class="badge reserved">${t("reserved")}</span>`);
   if(hotSet.has(i.id))b.push(`<span class="badge hot">🔥 ${t("hot")}</span>`);if(isNew(i))b.push(`<span class="badge new">NEW</span>`);if(off(i)&&s!=="sold")b.push(`<span class="badge off">${sale(i)?"⏰ ":""}-${off(i)}%</span>`);
   return b.length?`<div class="badges">${b.join("")}</div>`:""}
-function card(i,fav=true){const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
-  ${i.photos?.[0]?`<img class="ph" loading="lazy" decoding="async" src="${esc(th(i.photos[0]))}" data-full="${esc(i.photos[0])}" alt="${esc(i.brand+" "+i.name)}">`:`<div class="ph"></div>`}${badges(i)}
+function card(i,fav=true,k=99){const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
+  ${i.photos?.[0]?`<img class="ph" ${k<6?`loading="eager"${k<2?' fetchpriority="high"':""}`:'loading="lazy"'} decoding="async" src="${esc(th(i.photos[0]))}" data-full="${esc(i.photos[0])}" alt="${esc(i.brand+" "+i.name)}">`:`<div class="ph"></div>`}${badges(i)}
   ${fav?`<button class="fav${favs.has(i.id)?" on":""}" data-fav="${esc(i.id)}" aria-label="收藏">${favs.has(i.id)?"♥":"♡"}</button>`:""}
   <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${off(i)?`<span class="orig">${fmt(i.origPrice)}</span>`:""}</div>${sale(i)&&s!=="sold"?`<div class="cd" data-end="${i.saleEnd}">⏰ ${left(i.saleEnd-Date.now())}</div>`:""}
   ${fav?`<div class="tags">${[i.condition,i.size,i.category||i.group].filter(Boolean).map(x=>`<span class="tag">${esc(tr(x))}</span>`).join("")}${i.qty>1&&s!=="sold"?`<span class="stock">${t("left")(i.qty)}</span>`:""}</div>`:""}</div></div>`}
@@ -108,10 +108,13 @@ function render(){
     &&(!q||[i.name,i.brand,i.desc,i.group,i.category,tr(i.category),tr(groupOf(i)),groupOf(i),i.size,i.condition].join(" ").toLowerCase().includes(q)));
   const p=i=>i.price??(sort==="asc"?Infinity:-Infinity);
   list.sort((a,b)=>(status(a)==="sold")-(status(b)==="sold")||(sort==="asc"?p(a)-p(b):sort==="desc"?p(b)-p(a):sort==="hotS"?(hotSet.has(b.id)-hotSet.has(a.id))||((site.views||{})[b.id]||0)-((site.views||{})[a.id]||0):(b.createdAt||0)-(a.createdAt||0)));
-  $("grid").innerHTML=list.map(i=>card(i)).join("");
-  const rv=brand==="全部"&&!grp&&!q&&!onlyFav&&!pf?recent.map(id=>items.find(i=>i.id===id)).filter(Boolean):[];
-  $("recent").innerHTML=rv.length?`<div class="sec">${t("recent")}</div><div class="hscroll">${rv.map(i=>card(i,false)).join("")}</div>`:"";
+  $("grid").innerHTML=list.map((i,k)=>card(i,true,k)).join("");
+  renderRecent();
   $("empty").hidden=list.length>0;$("empty").textContent=onlyFav&&!favs.size?t("nofav"):items.length?t("nomatch"):t("empty");
+}
+function renderRecent(){
+  const q=$("q").value.trim(),pf=+$("fPrice").value>0,rv=brand==="全部"&&!grp&&!q&&!onlyFav&&!pf?recent.map(id=>items.find(i=>i.id===id)).filter(Boolean):[];
+  $("recent").innerHTML=rv.length?`<div class="sec">${t("recent")}</div><div class="hscroll">${rv.map(i=>card(i,false)).join("")}</div>`:"";
 }
 function fillFilters(){
   const sizes=[...new Set(items.map(i=>i.size).filter(Boolean))].sort(),sv=$("fSize").value;
@@ -169,7 +172,7 @@ function openView(it,idx=0){
     window.open(site.formspree.replace(/ITEM/g,encodeURIComponent(`${it.brand} ${it.name}${it.size?" / "+it.size:""} ${fmt(it.price)} ${shareUrl(it)}`)),"_blank","noopener")}else openOrder(it)};
   if(!$("viewDlg").open)$("viewDlg").showModal();
 }
-$("viewDlg").onclose=()=>{history.replaceState(null,"",location.pathname);render()};
+$("viewDlg").onclose=()=>{history.replaceState(null,"",location.pathname+location.search);renderRecent()};
 
 let orderItem=null;
 function openOrder(it){orderItem=it;$("orderForm").reset();$("oItem").textContent=`${it.brand} ${it.name}${it.size?" / "+it.size:""} · ${fmt(it.price)}`;$("oMsg").textContent="";$("oSend").disabled=false;$("orderDlg").showModal()}
@@ -233,7 +236,7 @@ $("menu").onclick=e=>{if(e.target===$("menu"))return $("menu").close();
 };
 document.addEventListener("error",e=>{const im=e.target;if(im.tagName==="IMG"&&im.dataset.full&&im.src.indexOf(im.dataset.full)<0)im.src=im.dataset.full},true);
 // 倒數計時：每秒更新，時間到自動恢復原價
-setInterval(()=>{let exp=false;document.querySelectorAll("[data-end]").forEach(e=>{const ms=+e.dataset.end-Date.now();if(ms<=0)exp=true;else e.textContent=(e.dataset.pre||"⏰ ")+left(ms)});
+setInterval(()=>{if(document.hidden)return;const els=document.querySelectorAll("[data-end]");if(!els.length)return;let exp=false;els.forEach(e=>{const ms=+e.dataset.end-Date.now();if(ms<=0)exp=true;else e.textContent=(e.dataset.pre||"⏰ ")+left(ms)});
   if(exp){items=items.map(applySale);render();const id=$("viewDlg").open&&$("viewDlg").dataset.id;if(id)openView(items.find(i=>i.id===id))}},1000);
 function seo(){
   const base=location.href.split("#")[0],s=document.createElement("script");s.type="application/ld+json";
@@ -242,7 +245,7 @@ function seo(){
 }
 applyLang();$("empty").textContent=t("loading");
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
-fetch("data.json?t="+Date.now()).then(r=>r.json()).then(d=>{
+fetch("data.json",{cache:"no-cache"}).then(r=>r.json()).then(d=>{
   site=d.site||{};items=(d.items||[]).filter(i=>!i.hidden).map(applySale);calcHot();if(site.info)$("infoBtn").hidden=false;foot();
   if(site.title){$("title").textContent=site.title;document.title=site.title}
   if(site.notice){$("notice").hidden=false;$("notice").textContent=site.notice}
