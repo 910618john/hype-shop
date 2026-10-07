@@ -6,7 +6,7 @@
 <script src="theme.js"></script><link rel="stylesheet" href="style.css"></head>
 <body>
 <header><div class="wrap">
-  <div class="top"><h1>後台</h1>
+  <div class="top"><h1>後台 <small id="me" style="font-size:13px;font-weight:500;color:var(--mute);letter-spacing:0"></small></h1>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="themeBtn" type="button">🌙</button><a class="btn" href="./" target="_blank">看前台</a><button id="setBtn" hidden>設定</button><button class="pri" id="addBtn" hidden>＋ 發布</button></div>
   </div>
   <div class="tabs" id="tabs" hidden><button data-tab="items" class="on">商品</button><button data-tab="brands">品牌</button><button data-tab="cats">分類</button><button data-tab="sales">銷售紀錄</button><span style="flex:1"></span><button id="csvItems">匯出商品 CSV</button></div>
@@ -19,7 +19,7 @@
     <div style="font-size:12px;color:var(--mute);margin-top:6px">iPhone 建議從「加入主畫面」的 App 登入，只要輸入一次</div>
     <div class="row"><button type="button" id="pasteBtn">📋 貼上</button><button class="pri" id="loginBtn">登入</button></div>
   </div>
-  <section id="pItems"><div class="grid" id="grid"></div><div class="empty" id="empty" hidden>還沒有商品，按「＋ 發布」</div></section>
+  <section id="pItems"><div class="filters" id="byBar" hidden style="padding-top:12px"><select id="byF"></select></div><div class="grid" id="grid"></div><div class="empty" id="empty" hidden>還沒有商品，按「＋ 發布」</div></section>
   <section id="pBrands" hidden></section>
   <section id="pCats" hidden></section>
   <section id="pSales" hidden></section>
@@ -111,6 +111,7 @@ const num=v=>v===""||v==null?null:Number(v);
 const status=i=>i.status||(i.sold?"sold":"available");
 const ls={get(k){try{return localStorage.getItem(k)||""}catch{return ""}},set(k,v){try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch{}}};
 let token=ls.get("gh_token"),data={site:{},items:[]},sha=null,editing=null,pending=[],sel=new Set(),tab="items";
+let me="",byF="";
 let priv=null,privSha=null,privState="none",privKey=null,privSalt=null;
 
 // ---------- GitHub ----------
@@ -188,14 +189,17 @@ const writeSitemap=()=>putFile("sitemap.xml",b64utf8(`<?xml version="1.0" encodi
 
 // ---------- 商品列表 ----------
 function render(){
-  const items=[...data.items].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const who=[...new Set(data.items.map(i=>i.by||""))];
+  $("byBar").hidden=who.length<2&&!who.some(w=>w&&w!==me);
+  $("byF").innerHTML=`<option value="">全部發布者（${data.items.length}）</option>`+(me?`<option value="@me">只看我發的（${data.items.filter(i=>i.by===me).length}）</option>`:"")+who.filter(w=>w!==me).map(w=>`<option value="${esc(w)}">${w?"@"+esc(w):"未記錄"}（${data.items.filter(i=>(i.by||"")===w).length}）</option>`).join("");$("byF").value=byF;if($("byF").value!==byF){byF="";$("byF").value=""}
+  const items=[...data.items].filter(i=>!byF||(byF==="@me"?i.by===me:(i.by||"")===byF)).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   $("brandList").innerHTML=allBrands().map(b=>`<option value="${esc(b)}">`).join("");
   $("sizeList").innerHTML=[...new Set([...SIZES,...items.map(i=>i.size).filter(Boolean)])].map(s=>`<option value="${esc(s)}">`).join("");
   $("grid").innerHTML=items.map(i=>{const s=status(i);return `<div class="card${s==="sold"?" sold":""}" data-id="${esc(i.id)}">
     ${i.photos?.[0]?`<img class="ph" loading="lazy" decoding="async" src="${esc(th(i.photos[0])||i.photos[0])}" data-full="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
     <input type="checkbox" class="chk" data-chk="${esc(i.id)}"${sel.has(i.id)?" checked":""}>
     <div class="badges">${i.hidden?`<span class="badge" style="background:#6b6b6b">草稿</span>`:""}${s==="sold"?`<span class="badge">SOLD</span>`:s==="reserved"?`<span class="badge reserved">保留中</span>`:""}</div>
-    <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${i.qty>1?` <span class="stock">×${i.qty}</span>`:""}</div><div style="font-size:12px;color:var(--mute)">${i.hot?"🔥 ":""}${(data.site.views||{})[i.id]!=null?"👁 "+data.site.views[i.id]:""}${i.saleEnd?` ⏰ 到 ${new Date(i.saleEnd).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`:""}</div>
+    <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${i.qty>1?` <span class="stock">×${i.qty}</span>`:""}</div><div style="font-size:12px;color:var(--mute)">${i.by?`👤 ${esc(i.by)} `:""}${i.hot?"🔥 ":""}${(data.site.views||{})[i.id]!=null?"👁 "+data.site.views[i.id]:""}${i.saleEnd?` ⏰ 到 ${new Date(i.saleEnd).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`:""}</div>
     <select data-st="${esc(i.id)}">${Object.entries(ST).map(([k,v])=>`<option value="${k}"${k===s?" selected":""}>${v}</option>`).join("")}</select></div></div>`}).join("");
   $("empty").hidden=items.length>0;
   for(const id of sel)if(!data.items.some(i=>i.id===id))sel.delete(id);
@@ -282,7 +286,7 @@ $("form").onsubmit=async e=>{
   if(editing&&!it){$("save").disabled=false;return $("fMsg").textContent="這件商品已被刪除，請關閉視窗"}
   const removed=(it?.photos||[]).filter(p=>!v.photos.includes(p)),isNewItem=!it,wasHidden=!!it?.hidden;
   try{
-    if(it){Object.assign(it,v);delete it.sold}else{it={id:Date.now().toString(36),createdAt:Date.now(),...v};data.items.push(it)}
+    if(it){Object.assign(it,v);delete it.sold}else{it={id:Date.now().toString(36),createdAt:Date.now(),by:me||undefined,...v};data.items.push(it)}if(isNewItem===false&&me)it.editedBy=me;
     data.site.brands=allBrands();
     await save((editing?"編輯：":"發布：")+v.name);
     if(privState==="open"){const c=num($("fCost").value);if((priv.costs[it.id]??null)!==c){c==null?delete priv.costs[it.id]:priv.costs[it.id]=c;await savePriv("更新成本")}}
@@ -308,7 +312,7 @@ $("sellBtn").onclick=()=>{
 $("saleCancel").onclick=()=>$("saleDlg").close();
 $("saleForm").onsubmit=async e=>{
   e.preventDefault();const it=data.items.find(i=>i.id===saleFor.id);if(!it){$("saleMsg").textContent="這件商品已被刪除";return}const q=Math.max(1,num($("sQty").value)||1);
-  const rec={id:Date.now().toString(36),itemId:it.id,brand:it.brand,name:it.name,size:it.size||"",qty:q,price:num($("sPrice").value)||0,cost:num($("sCost").value),date:$("sDate").value,buyer:$("sBuyer").value.trim(),note:$("sNote").value.trim()};
+  const rec={id:Date.now().toString(36),by:me||undefined,itemId:it.id,brand:it.brand,name:it.name,size:it.size||"",qty:q,price:num($("sPrice").value)||0,cost:num($("sCost").value),date:$("sDate").value,buyer:$("sBuyer").value.trim(),note:$("sNote").value.trim()};
   try{priv.sales.push(rec);if(rec.cost!=null&&priv.costs[it.id]==null)priv.costs[it.id]=rec.cost;await savePriv("成交："+it.name)}
   catch(err){priv.sales.pop();$("saleMsg").textContent=err.message;return}
   it.qty=Math.max(0,(it.qty??1)-q);if(it.qty===0){it.status="sold";delete it.sold}
@@ -340,9 +344,9 @@ function renderSales(){
     ${Object.keys(byM).sort().reverse().map(k=>{const x=sum(byM[k]);return `<tr><td>${k}</td><td class="n">${x.n}</td><td class="n">${fmt(x.r)}</td><td class="n">${fmt(x.c)}</td><td class="n">${fmt(x.r-x.c)}</td><td class="n">${x.r?Math.round((x.r-x.c)/x.r*100):0}%</td></tr>`}).join("")||`<tr><td colspan="6" style="color:var(--mute)">還沒有成交紀錄（在商品編輯頁按「記錄成交」）</td></tr>`}</table></div>
     <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><b>成交明細</b><span><button id="csvSales">匯出 CSV</button> <button id="lock">鎖定</button></span></div>
     <table><tr><th>日期</th><th>商品</th><th class="n">數量</th><th class="n">成交</th><th class="n">成本</th><th class="n">利潤</th><th>買家</th><th></th></tr>
-    ${S.map(s=>`<tr><td>${esc(s.date)}</td><td>${esc(s.brand+" "+s.name)}${s.size?" / "+esc(s.size):""}${s.note?`<div style="font-size:12px;color:var(--mute)">${esc(s.note)}</div>`:""}</td><td class="n">${s.qty}</td><td class="n">${fmt(rev(s))}</td><td class="n">${s.cost!=null?fmt(cost(s)):"—"}</td><td class="n">${s.cost!=null?fmt(rev(s)-cost(s)):"—"}</td><td>${esc(s.buyer)}</td><td><button class="danger" data-rmsale="${esc(s.id)}" style="padding:3px 10px">刪</button></td></tr>`).join("")}</table></div>`;
+    ${S.map(s=>`<tr><td>${esc(s.date)}</td><td>${esc(s.brand+" "+s.name)}${s.size?" / "+esc(s.size):""}${s.note?`<div style="font-size:12px;color:var(--mute)">${esc(s.note)}</div>`:""}</td><td class="n">${s.qty}</td><td class="n">${fmt(rev(s))}</td><td class="n">${s.cost!=null?fmt(cost(s)):"—"}</td><td class="n">${s.cost!=null?fmt(rev(s)-cost(s)):"—"}</td><td>${esc(s.buyer)}${s.by?`<div style="font-size:11px;color:var(--mute)">👤 ${esc(s.by)}</div>`:""}</td><td><button class="danger" data-rmsale="${esc(s.id)}" style="padding:3px 10px">刪</button></td></tr>`).join("")}</table></div>`;
   drawCharts(S,rev,cost);
-  $("csvSales").onclick=()=>csv("sales",[["日期","品牌","商品","尺寸","數量","成交單價","單件成本","營收","利潤","買家","備註"],...S.map(s=>[s.date,s.brand,s.name,s.size,s.qty,s.price,s.cost??"",rev(s),s.cost!=null?rev(s)-cost(s):"",s.buyer,s.note])]);
+  $("csvSales").onclick=()=>csv("sales",[["日期","品牌","商品","尺寸","數量","成交單價","單件成本","營收","利潤","買家","備註","登記者"],...S.map(s=>[s.date,s.brand,s.name,s.size,s.qty,s.price,s.cost??"",rev(s),s.cost!=null?rev(s)-cost(s):"",s.buyer,s.note,s.by||""])]);
   $("lock").onclick=()=>{kv.set("privKey");priv=null;privKey=null;privState="locked";render()};
   P.querySelectorAll("[data-rmsale]").forEach(b=>b.onclick=async()=>{if(!confirm("刪除這筆成交紀錄？（不會改回庫存）"))return;const old=priv.sales;priv.sales=priv.sales.filter(s=>s.id!==b.dataset.rmsale);
     try{await savePriv("刪除成交紀錄");render()}catch(err){priv.sales=old;alert(err.message)}});
@@ -383,8 +387,8 @@ function csv(name,rows){
   const t="\ufeff"+rows.map(r=>r.map(v=>{if(typeof v!=="number"&&/^[=+\-@\t\r]/.test(String(v??"")))v="'"+v;v=String(v??"");return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}).join(",")).join("\r\n");
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download=`${name}-${new Date().toISOString().slice(0,10)}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
-$("csvItems").onclick=()=>{const o=privState==="open";csv("items",[["ID","品牌","商品","大分類","小分類","尺寸","狀況","狀態","售價","原價","庫存",...(o?["成本"]:[]),"上架日期","照片數","連結"],
-  ...data.items.map(i=>[i.id,i.brand,i.name,groupOf(i),i.category,i.size,i.condition,ST[status(i)],i.price??"",i.origPrice??"",i.qty??1,...(o?[priv.costs[i.id]??""]:[]),new Date(i.createdAt||0).toISOString().slice(0,10),(i.photos||[]).length,BASE+"p/"+i.id+".html"])])};
+$("csvItems").onclick=()=>{const o=privState==="open";csv("items",[["ID","品牌","商品","大分類","小分類","尺寸","狀況","狀態","售價","原價","庫存",...(o?["成本"]:[]),"上架日期","發布者","照片數","連結"],
+  ...data.items.map(i=>[i.id,i.brand,i.name,groupOf(i),i.category,i.size,i.condition,ST[status(i)],i.price??"",i.origPrice??"",i.qty??1,...(o?[priv.costs[i.id]??""]:[]),new Date(i.createdAt||0).toISOString().slice(0,10),i.by||"",(i.photos||[]).length,BASE+"p/"+i.id+".html"])])};
 
 // ---------- IG 貼文圖 ----------
 function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
@@ -564,12 +568,14 @@ $("logout").onclick=async()=>{ls.set("gh_token","");ls.set("hs_pass","");await k
 
 async function start(){
   if(!token){$("login").hidden=false;return}
-  try{await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render();expireSales().then(()=>refreshViews())}
+  try{const u=await fetch("https://api.github.com/user",{headers:{Authorization:"Bearer "+token,Accept:"application/vnd.github+json"},cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);me=u?.login||"";$("me").textContent=me?"@"+me:"";
+    await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render();expireSales().then(()=>refreshViews())}
   catch(err){$("login").hidden=false;$("lMsg").textContent="登入失敗："+err.message}
 }
 $("pasteBtn").onclick=async()=>{try{const v=(await navigator.clipboard.readText()).trim();if(v){$("tok").value=v;token=v;start()}}catch{$("tok").focus();$("lMsg").textContent="無法讀取剪貼簿，請長按輸入框貼上"}};
 $("loginBtn").onclick=()=>{token=$("tok").value.trim();if(token)start()};
 document.addEventListener("error",e=>{const im=e.target;if(im.tagName==="IMG"&&im.dataset.full&&im.src.indexOf(im.dataset.full)<0)im.src=im.dataset.full},true);
+$("byF").onchange=()=>{byF=$("byF").value;render()};
 start();
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
