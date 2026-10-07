@@ -211,3 +211,7 @@ details>summary.msec{display:flex;justify-content:space-between}
 .badges{flex-wrap:wrap;right:48px}
 .sim .badges,.hscroll .badges{top:6px;left:6px;right:6px;gap:3px}
 .sim .badge,.hscroll .badge{font-size:10px;padding:2px 6px;letter-spacing:.05em}
+.revrow{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.revrow img,.revrow .ph0{width:72px;height:72px;object-fit:cover;border-radius:8px;background:var(--line);flex:none}
+.revrow .badge{position:static;display:inline-block;font-size:11px;padding:2px 8px}
+#subNote{font-size:14px;margin-top:12px}
