@@ -38,6 +38,8 @@
     <div><label>狀態</label><select id="fStatus"><option value="available">可購買</option><option value="reserved">保留中</option><option value="sold">已售出</option></select></div>
     <div><label>售價 (NT$)</label><input id="fPrice" type="number" min="0" inputmode="numeric"></div>
     <div><label>原價（有填才顯示折扣）</label><input id="fOrig" type="number" min="0" inputmode="numeric"></div>
+    <div><label>限時特價結束（要填原價）</label><input id="fSaleEnd" type="datetime-local"></div>
+    <div><label>&nbsp;</label><label style="display:flex;gap:8px;align-items:center;color:var(--fg);margin:8px 0 0"><input type="checkbox" id="fHot"> 🔥 手動標熱門</label></div>
     <div><label>庫存數量</label><input id="fQty" type="number" min="0" inputmode="numeric" value="1"></div>
     <div><label>成本（加密，不公開）</label><input id="fCost" type="number" min="0" inputmode="numeric"></div>
   </div>
@@ -91,7 +93,7 @@
   <label>浮水印文字（留空用 @IG帳號）</label><input id="sWmText">
   <label>下單表單：Google 表單「預先填入」連結（商品欄填 ITEM，留空不顯示下單）</label><input id="sForm" placeholder="https://docs.google.com/forms/d/e/.../viewform?usp=pp_url&entry.123=ITEM">
   <label>瀏覽統計 GoatCounter 代碼（<b>代碼</b>.goatcounter.com）</label><input id="sGc" placeholder="hypeshop">
-  <div id="gcLink" style="font-size:13px;margin-top:4px"></div>
+  <div id="gcLink" style="font-size:13px;margin-top:4px"></div><div style="margin-top:6px"><button type="button" id="viewsBtn" style="padding:4px 12px;font-size:13px">🔥 立即更新熱門</button> <span id="viewsMsg" style="font-size:12px;color:var(--mute)"></span></div>
   <div class="msg" id="sMsg"></div>
   <label>手機登入用</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button type="button" id="copyTok">📋 複製 Token</button><span style="font-size:12px;color:var(--mute)">複製後用 LINE 傳給自己，再貼到手機後台</span></div>
   <div class="row acts"><button type="button" id="logout">登出</button><button type="button" id="sCancel">取消</button><button class="pri" type="submit">儲存</button></div>
@@ -186,7 +188,7 @@ function render(){
     ${i.photos?.[0]?`<img class="ph" loading="lazy" src="${esc(i.photos[0])}" alt="">`:`<div class="ph"></div>`}
     <input type="checkbox" class="chk" data-chk="${esc(i.id)}"${sel.has(i.id)?" checked":""}>
     <div class="badges">${i.hidden?`<span class="badge" style="background:#6b6b6b">草稿</span>`:""}${s==="sold"?`<span class="badge">SOLD</span>`:s==="reserved"?`<span class="badge reserved">保留中</span>`:""}</div>
-    <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${i.qty>1?` <span class="stock">×${i.qty}</span>`:""}</div>
+    <div class="meta"><div class="brand">${esc(i.brand)}</div><div class="name">${esc(i.name)}</div><div class="price">${fmt(i.price)}${i.qty>1?` <span class="stock">×${i.qty}</span>`:""}</div><div style="font-size:12px;color:var(--mute)">${i.hot?"🔥 ":""}${(data.site.views||{})[i.id]!=null?"👁 "+data.site.views[i.id]:""}${i.saleEnd?` ⏰ 到 ${new Date(i.saleEnd).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`:""}</div>
     <select data-st="${esc(i.id)}">${Object.entries(ST).map(([k,v])=>`<option value="${k}"${k===s?" selected":""}>${v}</option>`).join("")}</select></div></div>`}).join("");
   $("empty").hidden=items.length>0;
   for(const id of sel)if(!data.items.some(i=>i.id===id))sel.delete(id);
@@ -218,7 +220,7 @@ function openForm(it,asCopy=false){
   const opt=(l,v)=>`<option value="">—</option>`+[...l,...(v&&!l.includes(v)?[v]:[])].map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
   $("fGrp").innerHTML=opt(groups().map(g=>g.name),it?.group);$("fGrp").value=it?groupOf(it):"";fillSubs(it?.category);$("fCond").innerHTML=opt(CONDS,it?.condition);
   $("fBrand").value=it?.brand||"";$("fName").value=it?.name||"";$("fSize").value=asCopy?"":it?.size||"";
-  $("fCond").value=it?.condition||"";$("fPrice").value=it?.price??"";$("fOrig").value=it?.origPrice??"";$("fQty").value=asCopy?1:it?.qty??1;
+  $("fCond").value=it?.condition||"";$("fPrice").value=it?.price??"";$("fOrig").value=it?.origPrice??"";$("fSaleEnd").value=it?.saleEnd&&!asCopy?toLocal(it.saleEnd):"";$("fHot").checked=!!it?.hot&&!asCopy;$("fQty").value=asCopy?1:it?.qty??1;
   $("fStatus").value=asCopy?"available":it?status(it):"available";$("fDesc").value=it?.desc||"";$("fHidden").checked=!!it?.hidden&&!asCopy;
   const open=privState==="open";$("fCost").disabled=!open;$("costHint").hidden=open;$("fCost").value=open&&it?priv.costs[it.id]??"":"";
   pending=(it?.photos||[]).map(p=>({path:p,url:p}));$("fPhotos").value="";$("fMsg").textContent=asCopy?"已複製，請修改尺寸等資料後發布":"";drawThumbs();
@@ -262,8 +264,11 @@ $("fPhotos").onchange=async e=>{
 $("form").onsubmit=async e=>{
   e.preventDefault();
   const v={brand:$("fBrand").value.trim(),name:$("fName").value.trim(),group:$("fGrp").value,category:$("fCat").value,size:$("fSize").value.trim(),condition:$("fCond").value,
-    price:num($("fPrice").value),origPrice:num($("fOrig").value),qty:num($("fQty").value)??1,status:$("fStatus").value,desc:$("fDesc").value.trim(),photos:pending.map(p=>p.path),hidden:$("fHidden").checked};
-  if(!v.brand||!v.name)return;$("save").disabled=true;$("fMsg").textContent="儲存中…";
+    price:num($("fPrice").value),origPrice:num($("fOrig").value),saleEnd:$("fSaleEnd").value?new Date($("fSaleEnd").value).getTime():null,hot:$("fHot").checked,qty:num($("fQty").value)??1,status:$("fStatus").value,desc:$("fDesc").value.trim(),photos:pending.map(p=>p.path),hidden:$("fHidden").checked};
+  if(!v.brand||!v.name)return;
+  if(v.saleEnd&&!(v.origPrice>v.price))return $("fMsg").textContent="限時特價要填「原價」，而且原價要高於售價";
+  if(v.saleEnd&&v.saleEnd<=Date.now())return $("fMsg").textContent="特價結束時間要在未來";
+  $("save").disabled=true;$("fMsg").textContent="儲存中…";
   const removed=(editing?.photos||[]).filter(p=>!v.photos.includes(p)),isNewItem=!editing,wasHidden=!!editing?.hidden;let it=editing;
   try{
     if(it){Object.assign(it,v);delete it.sold}else{it={id:Date.now().toString(36),createdAt:Date.now(),...v};data.items.push(it)}
@@ -493,6 +498,24 @@ $("szCancel").onclick=()=>$("sizeEdDlg").close();
 $("szSave").onclick=async()=>{const v=$("szText").value.trim(),sc={...(data.site.sizeCharts||{})};v?sc[szGroup]=v:delete sc[szGroup];data.site.sizeCharts=sc;
   $("szSave").disabled=true;try{await save("尺寸表："+szGroup);$("sizeEdDlg").close()}catch(err){$("szMsg").textContent=err.message}$("szSave").disabled=false};
 
+// ---------- 限時特價到期 / 熱門瀏覽數 ----------
+const toLocal=ms=>{const d=new Date(ms-new Date(ms).getTimezoneOffset()*6e4);return d.toISOString().slice(0,16)};
+async function expireSales(){
+  const ex=data.items.filter(i=>i.saleEnd&&Date.now()>=i.saleEnd);if(!ex.length)return;
+  ex.forEach(i=>{if(i.origPrice)i.price=i.origPrice;i.origPrice=null;i.saleEnd=null});
+  try{await save(`限時特價結束，恢復原價：${ex.length} 件`);for(const i of ex)await writePage(i)}catch{}
+}
+async function gcCount(id){const base=`https://${data.site.goatcounter}.goatcounter.com/counter/`;
+  for(const p of [encodeURIComponent("item/"+id),encodeURIComponent("/item/"+id)]){try{const r=await fetch(base+p+".json");if(r.ok){const j=await r.json();return parseInt(String(j.count).replace(/\D/g,""))||0}if(r.status!==404)return null}catch{return null}}return 0}
+async function refreshViews(force){
+  const gc=data.site.goatcounter;if(!gc||!data.items.length)return "noGc";if(!force&&Date.now()-(data.site.viewsAt||0)<6*36e5)return "fresh";
+  const v={};let ok=0;const list=data.items.filter(i=>!i.hidden);
+  for(let k=0;k<list.length;k+=6)await Promise.all(list.slice(k,k+6).map(async i=>{const n=await gcCount(i.id);if(n!=null){v[i.id]=n;ok++}}));
+  if(!ok)return "fail";
+  if(JSON.stringify(v)!==JSON.stringify(data.site.views||{})||force){data.site.views=v;data.site.viewsAt=Date.now();await save("更新熱門瀏覽數").catch(()=>{})}
+  return "ok";
+}
+
 // ---------- 設定 ----------
 $("sGc").oninput=()=>{const v=$("sGc").value.trim();$("gcLink").innerHTML=v?`<a href="https://${esc(v)}.goatcounter.com" target="_blank" rel="noopener">→ 查看瀏覽統計</a>`:`<a href="https://www.goatcounter.com/signup" target="_blank" rel="noopener">→ 免費申請 GoatCounter</a>`};
 $("setBtn").onclick=()=>{const s=data.site;$("sTitle").value=s.title||"";$("sNotice").value=s.notice||"";$("sInfo").value=s.info||"";$("sIg").value=s.ig||"";$("sLine").value=s.line||"";$("sWm").checked=s.watermark!==false;$("sWmText").value=s.wmText||"";
@@ -524,11 +547,13 @@ $("setForm").onsubmit=async e=>{e.preventDefault();const s=data.site;
     formspree:(v=>/^https?:/.test(v)&&!/formspree\.io/.test(v)?v:v.replace(/^.*\/f\//,""))($("sForm").value.trim()),goatcounter:$("sGc").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\.goatcounter\.com.*$/,"")});
   try{await save("更新網站設定");$("setDlg").close()}catch(err){$("sMsg").textContent=err.message}};
 $("copyTok").onclick=async()=>{try{await navigator.clipboard.writeText(token);$("copyTok").textContent="已複製 ✓"}catch{prompt("長按複製這段 Token",token)}setTimeout(()=>$("copyTok").textContent="📋 複製 Token",2000)};
+$("viewsBtn").onclick=async()=>{$("viewsMsg").textContent="更新中…";const r=await refreshViews(true);
+  $("viewsMsg").textContent={ok:"已更新 ✓",noGc:"先填 GoatCounter 代碼並儲存",fail:"讀不到瀏覽數：請到 GoatCounter → Settings 勾選「Allow adding visitor counts on your website」"}[r]||""};
 $("logout").onclick=()=>{ls.set("gh_token","");ls.set("hs_pass","");location.reload()};
 
 async function start(){
   if(!token){$("login").hidden=false;return}
-  try{await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render()}
+  try{await load();await loadPriv().catch(()=>{});$("login").hidden=true;$("addBtn").hidden=$("setBtn").hidden=$("tabs").hidden=false;ls.set("gh_token",token);navigator.storage?.persist?.().catch(()=>{});render();expireSales().then(()=>refreshViews())}
   catch(err){$("login").hidden=false;$("lMsg").textContent="登入失敗："+err.message}
 }
 $("pasteBtn").onclick=async()=>{try{const v=(await navigator.clipboard.readText()).trim();if(v){$("tok").value=v;token=v;start()}}catch{$("tok").focus();$("lMsg").textContent="無法讀取剪貼簿，請長按輸入框貼上"}};

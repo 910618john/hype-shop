@@ -204,3 +204,10 @@ details .mi:not(summary){padding-left:28px;font-size:14px}
 details>summary.msec{display:flex;justify-content:space-between}
 @media(max-width:600px){dialog.drawer{height:100%;margin:0;border-radius:0 16px 16px 0}}
 .top .search{margin-left:0}
+.badge.hot{background:#e8590c}
+.cd{font-size:12px;font-weight:700;color:var(--danger);font-variant-numeric:tabular-nums}
+.cd.big{font-size:14px;margin-top:4px}
+.badge{white-space:nowrap}
+.badges{flex-wrap:wrap;right:48px}
+.sim .badges,.hscroll .badges{top:6px;left:6px;right:6px;gap:3px}
+.sim .badge,.hscroll .badge{font-size:10px;padding:2px 6px;letter-spacing:.05em}
