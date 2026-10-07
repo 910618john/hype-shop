@@ -9,7 +9,9 @@
     "formspree": "",
     "goatcounter": "hypeshop",
     "logos": {},
-    "info": ""
+    "info": "",
+    "review": true,
+    "admins": []
   },
   "items": []
 }
