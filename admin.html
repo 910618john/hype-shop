@@ -87,6 +87,7 @@
   <h2>網站設定</h2>
   <label>網站名稱</label><input id="sTitle">
   <label>公告橫幅（留空不顯示）</label><input id="sNotice" placeholder="例：本週新到貨！10/20–10/25 暫停出貨">
+  <label>關於我們（# 開頭是標題，- 開頭是條列）<button type="button" id="aboutTpl" style="padding:2px 10px;font-size:12px;margin-left:6px">套用範本</button></label><textarea id="sAbout" style="min-height:120px" placeholder="留空不顯示"></textarea>
   <label>購物須知（# 開頭是標題，- 開頭是條列）<button type="button" id="infoTpl" style="padding:2px 10px;font-size:12px;margin-left:6px">套用範本</button></label><textarea id="sInfo" style="min-height:140px" placeholder="留空不顯示"></textarea>
   <label>IG 帳號（不含 @）</label><input id="sIg" placeholder="your_ig">
   <label>LINE（ID、@官方帳號 或 加好友連結）</label><input id="sLine" placeholder="@xxx 或 https://line.me/...">
@@ -654,7 +655,7 @@ async function reject(r,btn){
 $("sGc").oninput=()=>{const v=$("sGc").value.trim();$("gcLink").innerHTML=v?`<a href="https://${esc(v)}.goatcounter.com" target="_blank" rel="noopener">→ 查看瀏覽統計</a>`:`<a href="https://www.goatcounter.com/signup" target="_blank" rel="noopener">→ 免費申請 GoatCounter</a>`};
 $("setBtn").onclick=()=>{if(!isAdm())return;const s=data.site;$("sReview").checked=!!s.review;$("sReview").disabled=!repoAdmin;
   $("protMsg").innerHTML=repoAdmin?`<span style="color:var(--mute)">讀取 main 保護狀態中…</span>`:`<span style="color:var(--mute)">只有 repo 擁有者能切換審核制</span>`;
-  if(repoAdmin)api(`/branches/${BRANCH}`).then(b=>{$("protMsg").innerHTML=b.protected?`<span style="color:var(--ok)">✅ main 分支已保護</span>`:`<span style="color:var(--danger)">⚠️ main 分支尚未保護：審核制需要開啟，<a href="https://github.com/${OWNER}/${REPO}/settings/branches" target="_blank" rel="noopener">到 GitHub 設定</a>（步驟見對話說明）</span>`}).catch(()=>{$("protMsg").textContent=""});$("sAdmins").value=(s.admins||[]).join("\n");$("sTitle").value=s.title||"";$("sNotice").value=s.notice||"";$("sInfo").value=s.info||"";$("sIg").value=s.ig||"";$("sLine").value=s.line||"";$("sWm").checked=s.watermark!==false;$("sWmText").value=s.wmText||"";
+  if(repoAdmin)api(`/branches/${BRANCH}`).then(b=>{$("protMsg").innerHTML=b.protected?`<span style="color:var(--ok)">✅ main 分支已保護</span>`:`<span style="color:var(--danger)">⚠️ main 分支尚未保護：審核制需要開啟，<a href="https://github.com/${OWNER}/${REPO}/settings/branches" target="_blank" rel="noopener">到 GitHub 設定</a>（步驟見對話說明）</span>`}).catch(()=>{$("protMsg").textContent=""});$("sAdmins").value=(s.admins||[]).join("\n");$("sTitle").value=s.title||"";$("sNotice").value=s.notice||"";$("sInfo").value=s.info||"";$("sAbout").value=s.about||"";$("sIg").value=s.ig||"";$("sLine").value=s.line||"";$("sWm").checked=s.watermark!==false;$("sWmText").value=s.wmText||"";
   $("sForm").value=s.formspree||"";$("sGc").value=s.goatcounter||"";$("sGc").oninput();$("sMsg").textContent="";$("setDlg").showModal()};
 $("sCancel").onclick=()=>$("setDlg").close();
 const INFO_TPL=`# 付款方式
@@ -677,9 +678,21 @@ const INFO_TPL=`# 付款方式
 # 常見問題
 - 可以議價嗎？歡迎私訊詢問
 - 可以保留嗎？付訂金可保留 3 天`;
+const ABOUT_TPL=`# 我們是誰
+熱愛潮流與精品的小團隊，從自己的收藏開始，把好東西分享給同樣喜歡的人。
+
+# 我們的堅持
+- 只賣正品，每件商品都親自檢查
+- 照片實拍，狀況如實描述
+- 有任何問題都可以私訊，我們會盡快回覆
+
+# 聯絡我們
+- IG 私訊最快
+- 營業時間：每天 12:00–22:00`;
+$("aboutTpl").onclick=()=>{if(!$("sAbout").value.trim()||confirm("覆蓋目前內容？"))$("sAbout").value=ABOUT_TPL};
 $("infoTpl").onclick=()=>{if(!$("sInfo").value.trim()||confirm("覆蓋目前內容？"))$("sInfo").value=INFO_TPL};
 $("setForm").onsubmit=async e=>{e.preventDefault();if(!isAdm())return;const s=data.site;if(repoAdmin)s.review=$("sReview").checked;s.admins=[...new Set($("sAdmins").value.split(/[\s,，]+/).map(x=>x.trim().replace(/^@/,"")).filter(Boolean))];
-  Object.assign(s,{title:$("sTitle").value.trim(),notice:$("sNotice").value.trim(),info:$("sInfo").value.trim(),ig:$("sIg").value.trim().replace(/^@/,""),line:$("sLine").value.trim(),watermark:$("sWm").checked,wmText:$("sWmText").value.trim(),
+  Object.assign(s,{title:$("sTitle").value.trim(),notice:$("sNotice").value.trim(),info:$("sInfo").value.trim(),about:$("sAbout").value.trim(),ig:$("sIg").value.trim().replace(/^@/,""),line:$("sLine").value.trim(),watermark:$("sWm").checked,wmText:$("sWmText").value.trim(),
     formspree:(v=>/^https?:/.test(v)&&!/formspree\.io/.test(v)?v:v.replace(/^.*\/f\//,""))($("sForm").value.trim()),goatcounter:$("sGc").value.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/\.goatcounter\.com.*$/,"")});
   try{await save("更新網站設定");$("setDlg").close();review=!!data.site.review;render();loadReviews()}catch(err){$("sMsg").textContent=err.message}};
 $("copyTok").onclick=async()=>{try{await navigator.clipboard.writeText(token);$("copyTok").textContent="已複製 ✓"}catch{prompt("長按複製這段 Token",token)}setTimeout(()=>$("copyTok").textContent="📋 複製 Token",2000)};

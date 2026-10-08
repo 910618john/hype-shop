@@ -46,12 +46,12 @@ const fmt=n=>n||n===0?"NT$ "+Number(n).toLocaleString():"";
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const GROUPS=[{name:"衣服",subs:["上衣","襯衫","帽T / 衛衣","針織 / 毛衣","外套","褲子","短褲"]},{name:"鞋子",subs:["球鞋","靴子","拖鞋 / 涼鞋","皮鞋"]},{name:"飾品",subs:["項鍊","手環","戒指","耳環","手錶"]},{name:"包包",subs:["後背包","側背包","托特包","皮夾"]},{name:"配件",subs:["帽子","皮帶","襪子","其他"]}],NEWC=["全新未拆","全新"];
 const T={
- zh:{search:"搜尋商品",all:"全部",allCat:"全部類別",allCond:"全部",price:["全部價格","NT$ 1,000 以下","1,000–3,000","3,000–10,000","10,000 以上"],recent:"最近瀏覽",hot:"熱門",hotS:"熱門優先",saleEnds:"⏰ 特價倒數",mAll:"全部商品",mCats:"分類",mBrands:"品牌",mMore:"更多",mContact:"聯絡我們",info:"購物須知",sizeChart:"尺寸表",newC:"全新",usedC:"二手",allSize:"全部尺寸",new:"最新上架",asc:"價格 低→高",desc:"價格 高→低",avail:"只看可購買",favs:"♥ 收藏",empty:"還沒有商品",nomatch:"沒有符合的商品",nofav:"還沒有收藏，點商品右上角 ♡",loading:"載入中…",fail:"讀取失敗，請重新整理",
+ zh:{search:"搜尋商品",all:"全部",allCat:"全部類別",allCond:"全部",price:["全部價格","NT$ 1,000 以下","1,000–3,000","3,000–10,000","10,000 以上"],recent:"最近瀏覽",hot:"熱門",hotS:"熱門優先",saleEnds:"⏰ 特價倒數",mAll:"全部商品",mCats:"分類",mBrands:"品牌",mMore:"更多",mContact:"聯絡我們",info:"購物須知",about:"關於我們",sizeChart:"尺寸表",newC:"全新",usedC:"二手",allSize:"全部尺寸",new:"最新上架",asc:"價格 低→高",desc:"價格 高→低",avail:"只看可購買",favs:"♥ 收藏",empty:"還沒有商品",nomatch:"沒有符合的商品",nofav:"還沒有收藏，點商品右上角 ♡",loading:"載入中…",fail:"讀取失敗，請重新整理",
    reserved:"保留中",sold:"已售出",cond:"狀況",size:"尺寸",cat:"類別",share:"分享",askLine:"LINE 詢問",askIg:"IG 詢問",close:"關閉",order:"我要下單",left:n=>`剩 ${n} 件`,similar:"你可能也喜歡",
    cpIg:"已複製詢問內容，貼到 IG 私訊即可",cpLine:"已複製詢問內容，貼到 LINE 即可",cpLink:"已複製連結",ask:"你好，想詢問：",
    oTitle:"下單資料",oName:"姓名",oPhone:"電話",oContact:"IG / LINE 帳號",oShip:"取貨方式",oAddr:"門市名稱 / 地址",oNote:"備註",cancel:"取消",send:"送出",sending:"送出中…",sent:"已送出！我們會盡快聯絡你",oFail:"送出失敗，請改用 IG / LINE 聯絡",
    ship:["7-11 店到店","全家店到店","宅配","面交"]},
- en:{search:"Search",all:"All",allCat:"All categories",allCond:"All",price:["Any price","Under NT$1,000","1,000–3,000","3,000–10,000","Over 10,000"],recent:"Recently viewed",hot:"Hot",hotS:"Most popular",saleEnds:"⏰ Sale ends in",mAll:"All items",mCats:"Categories",mBrands:"Brands",mMore:"More",mContact:"Contact",info:"Shopping info",sizeChart:"Size chart",newC:"New",usedC:"Pre-owned",allSize:"All sizes",new:"Newest",asc:"Price: low → high",desc:"Price: high → low",avail:"Available only",favs:"♥ Saved",empty:"No items yet",nomatch:"No matching items",nofav:"Nothing saved yet — tap ♡ on an item",loading:"Loading…",fail:"Failed to load, please refresh",
+ en:{search:"Search",all:"All",allCat:"All categories",allCond:"All",price:["Any price","Under NT$1,000","1,000–3,000","3,000–10,000","Over 10,000"],recent:"Recently viewed",hot:"Hot",hotS:"Most popular",saleEnds:"⏰ Sale ends in",mAll:"All items",mCats:"Categories",mBrands:"Brands",mMore:"More",mContact:"Contact",info:"Shopping info",about:"About us",sizeChart:"Size chart",newC:"New",usedC:"Pre-owned",allSize:"All sizes",new:"Newest",asc:"Price: low → high",desc:"Price: high → low",avail:"Available only",favs:"♥ Saved",empty:"No items yet",nomatch:"No matching items",nofav:"Nothing saved yet — tap ♡ on an item",loading:"Loading…",fail:"Failed to load, please refresh",
    reserved:"Reserved",sold:"Sold",cond:"Condition",size:"Size",cat:"Category",share:"Share",askLine:"Ask on LINE",askIg:"Instagram",close:"Close",order:"Order",left:n=>`${n} left`,similar:"You may also like",
    cpIg:"Message copied — paste it in your Instagram DM",cpLine:"Message copied — paste it in LINE",cpLink:"Link copied",ask:"Hi, I'm interested in: ",
    oTitle:"Order details",oName:"Name",oPhone:"Phone",oContact:"Instagram / LINE ID",oShip:"Delivery",oAddr:"Store / address",oNote:"Notes",cancel:"Cancel",send:"Send",sending:"Sending…",sent:"Sent! We'll contact you soon",oFail:"Failed — please contact us on IG / LINE",
@@ -202,9 +202,10 @@ $("zoom").onwheel=e=>{e.preventDefault();Z.s=Math.min(5,Math.max(1,Z.s*(e.deltaY
 function tableHtml(txt){const rows=String(txt).trim().split(/\n+/).map(r=>r.split(/\t|,|，|\|/).map(c=>c.trim()));
   return `<table class="size"><tr>${rows[0].map(c=>`<th>${esc(c)}</th>`).join("")}</tr>${rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</table>`}
 function mdHtml(txt){return esc(txt).split(/\n/).map(l=>/^#\s*/.test(l)?`<h3>${l.replace(/^#\s*/,"")}</h3>`:/^[-•]\s*/.test(l)?`<li>${l.replace(/^[-•]\s*/,"")}</li>`:l.trim()?`<p>${l}</p>`:"").join("")}
-function foot(){const L=[];if(site.info)L.push(`<a href="#" id="footInfo">${t("info")}</a>`);if(site.ig)L.push(`<a href="https://instagram.com/${encodeURIComponent(site.ig)}" target="_blank" rel="noopener">Instagram</a>`);if(site.line)L.push(`<a href="${esc(lineUrl(site.line))}" target="_blank" rel="noopener">LINE</a>`);
-  $("foot").innerHTML=`<div>${L.join(" · ")}</div><div style="margin-top:6px">© ${new Date().getFullYear()} ${esc(site.title||"HYPE")}</div>`;if($("footInfo"))$("footInfo").onclick=e=>{e.preventDefault();openInfo()}}
-function openInfo(){$("infoBody").innerHTML=`<h2>${t("info")}</h2>`+mdHtml(site.info||"");$("infoDlg").showModal()}
+function foot(){const L=[];if(site.about)L.push(`<a href="#" id="footAbout">${t("about")}</a>`);if(site.info)L.push(`<a href="#" id="footInfo">${t("info")}</a>`);if(site.ig)L.push(`<a href="https://instagram.com/${encodeURIComponent(site.ig)}" target="_blank" rel="noopener">Instagram</a>`);if(site.line)L.push(`<a href="${esc(lineUrl(site.line))}" target="_blank" rel="noopener">LINE</a>`);
+  $("foot").innerHTML=`<div>${L.join(" · ")}</div><div style="margin-top:6px">© ${new Date().getFullYear()} ${esc(site.title||"HYPE")}</div>`;if($("footInfo"))$("footInfo").onclick=e=>{e.preventDefault();openInfo()};if($("footAbout"))$("footAbout").onclick=e=>{e.preventDefault();openAbout()}}
+function openDoc(title,txt){$("infoBody").innerHTML=`<h2>${esc(title)}</h2>`+mdHtml(txt||"");$("infoDlg").showModal()}
+const openInfo=()=>openDoc(t("info"),site.info),openAbout=()=>openDoc(t("about"),site.about);
 $("infoBtn").onclick=openInfo;$("infoClose").onclick=()=>$("infoDlg").close();$("sizeClose").onclick=()=>$("sizeDlg").close();
 // ---------- 左上角選單 ----------
 function openMenu(){
@@ -219,7 +220,7 @@ function openMenu(){
         :it(`data-mg="${esc(g.name)}" data-mc=""`,esc(tr(g.name)),n(i=>groupOf(i)===g.name),grp===g.name)}).join(""):"")
    +(brands.length?`<details open><summary class="msec">${t("mBrands")}</summary>${brands.map(b=>it(`data-mb="${esc(b)}"`,`${site.logos?.[b]?`<img src="${esc(site.logos[b])}" alt="">`:""}${esc(b)}`,n(i=>i.brand===b),brand===b)).join("")}</details>`:"")
    +`<div class="msec">${t("mMore")}</div>`+it('data-m="fav"',"♥ "+t("favs").replace(/^♥\s*/,""),favs.size,onlyFav)
-   +(site.info?it('data-m="info"',t("info")):"")
+   +(site.about?it('data-m="about"',t("about")):"")+(site.info?it('data-m="info"',t("info")):"")
    +(site.ig?`<a class="mi" href="https://instagram.com/${encodeURIComponent(site.ig)}" target="_blank" rel="noopener"><span>Instagram</span><small>@${esc(site.ig)}</small></a>`:"")
    +(site.line?`<a class="mi" href="${esc(lineUrl(site.line))}" target="_blank" rel="noopener"><span>LINE</span></a>`:"");
   $("menu").showModal();
@@ -231,6 +232,7 @@ $("menu").onclick=e=>{if(e.target===$("menu"))return $("menu").close();
   if(d.m==="all")pick(()=>{brand="全部";grp=cat=cond="";onlyFav=onlyAvail=false;$("q").value="";$("fPrice").value="0";$("fSize").value=""});
   else if(d.m==="fav")pick(()=>{onlyFav=true});
   else if(d.m==="info"){$("menu").close();openInfo()}
+  else if(d.m==="about"){$("menu").close();openAbout()}
   else if(d.mg!=null)pick(()=>{grp=d.mg;cat=d.mc;brand="全部";onlyFav=false});
   else if(d.mb!=null)pick(()=>{brand=d.mb;grp=cat="";onlyFav=false});
 };
